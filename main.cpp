@@ -1,4 +1,6 @@
 #include <SDL.h>
+#include <SDL_events.h>
+
 #include "include/core/SkCanvas.h"
 #include "include/core/SkSurface.h"
 #include "include/core/SkPaint.h"
@@ -19,6 +21,10 @@
 #include "include/core/SkBlurTypes.h"
 // #include "include/gpu/gl/GrGLInterface.h"
 // #include "include/core/SkSurface.h"
+
+float distance(float x1, float y1, float x2, float y2) {
+    return std::sqrt(std::pow(x2 - x1, 2) + std::pow(y2 - y1, 2));
+}
 
 // const std::string skslCode = R"(
 //         uniform vec2 iResolution;
@@ -153,7 +159,71 @@ const std::string pathShader = R"(
 //     return half4(1.0 - brighten, 1.0 - brighten, 1.0 - brighten, 0.5);
 //     }
 // )";
+struct Pos{ float x; float y;};
+struct PosInt{ int x; int y;};
 
+std::vector<PosInt> pointsPath;
+
+struct Ranges{int minX=0, minY=0, maxX=0, maxY=0;};
+Ranges ranges;
+
+
+// Function to handle pan events
+void handlePanEvent(SDL_Event &event)
+{
+    static bool panStarted = false;
+    switch (event.type)
+    {
+    case SDL_MOUSEBUTTONDOWN: {
+        const SDL_MouseButtonEvent& evt = event.button;
+        std::cout << "Pan started at (x:" << evt.x << ", y:" << evt.y << ")\n";
+        panStarted = true;
+        pointsPath.clear();
+        ranges = Ranges{evt.x, evt.y, evt.x, evt.y};
+        pointsPath.reserve(1000);
+        pointsPath.emplace_back(PosInt{evt.x, evt.y});
+        break;
+    }
+    case SDL_MOUSEMOTION: {
+        const SDL_MouseMotionEvent& evt = event.motion;
+        std::cout << "Pan updated to (x:" << evt.x << ", y:" << evt.y << ")\n";
+        if (panStarted) {
+            if (distance(pointsPath.rbegin()->x, pointsPath.rbegin()->y, evt.x, evt.y) > 10.0) {
+                pointsPath.emplace_back(PosInt{evt.x, evt.y});
+                ranges.minX = std::min(evt.x, ranges.minX);
+                ranges.minY = std::min(evt.y, ranges.minY);
+                ranges.maxX = std::max(evt.x, ranges.maxX);
+                ranges.maxY = std::max(evt.y, ranges.maxY);
+            }
+        }
+        break;
+    }
+    case SDL_MOUSEBUTTONUP: {
+        const SDL_MouseButtonEvent& evt = event.button;
+        std::cout << "Pan ended at (x:" << evt.x << ", y:" << evt.y << ")\n";
+        panStarted = false;
+        auto deltaX = static_cast<float>(ranges.maxX - ranges.minX);
+        auto deltaY = static_cast<float>(ranges.maxY - ranges.minY);
+        auto coeff = std::max(deltaX / deltaY, deltaY / deltaX);
+        auto sz = static_cast<int>(pointsPath.size());
+        if ((sz > 10)
+        && (deltaX > 10.0 && deltaY > 10.0)
+        && (coeff < 2.0)
+        && (std::min(deltaX, deltaY) > (distance(pointsPath[0].x, pointsPath[0].y, pointsPath.rbegin()->x, pointsPath.rbegin()->y) / 10.0)))
+        {
+            pointsPath.push_back(pointsPath[0]);
+            std::cout << "Closing path, pointsPath::size: " << pointsPath.size() << "\n";
+        } else {
+            std::cout << "Should clean path here \n";
+            pointsPath.clear();
+        }
+        ranges = Ranges{};
+        break;
+    }
+    default:
+        break;
+    }
+}
 
 // Atomic flag to control the event polling thread
 std::atomic<bool> running(true);
@@ -166,9 +236,18 @@ void PollEvents()
         while (SDL_PollEvent(&event))
         {
             // Handle events here
-            if (event.type == SDL_QUIT)
-            {
+            switch(event.type) {
+            case SDL_QUIT: 
                 running = false;
+                break;
+
+            case SDL_MOUSEMOTION: /**< Mouse moved */
+            case SDL_MOUSEBUTTONDOWN:        /**< Mouse button pressed */
+            case SDL_MOUSEBUTTONUP:          /**< Mouse button released */
+            // case SDL_MOUSEWHEEL:
+                // std::cout << "SDL_MOUSE_X event.type:" << event.type << std::endl;
+                handlePanEvent(event);
+                break;
             }
         }
         // Sleep to prevent high CPU usage
@@ -213,7 +292,6 @@ int main(int argc, char *argv[])
     std::thread eventThread(PollEvents);
 
 
-    struct Pos{ float x; float y;};
     Pos positions[100] = {
         {0.0f, 0.0f}, {0.01f, 0.01f}, {0.02f, 0.02f}, {0.03f, 0.03f}, {0.04f, 0.04f},
         {0.05f, 0.05f}, {0.06f, 0.06f}, {0.07f, 0.07f}, {0.08f, 0.08f}, {0.09f, 0.09f},
@@ -336,26 +414,34 @@ int main(int argc, char *argv[])
         SkColor colors[2] = { SK_ColorRED, SK_ColorBLUE };
         shader = SkGradientShader::MakeLinear(pointsColor, colors, nullptr, std::size(colors), SkTileMode::kClamp);
 
-        paint.setStrokeWidth(5);
-        paint.setMaskFilter(SkMaskFilter::MakeBlur(kSolid_SkBlurStyle, 20.0f, true));
+
+        paint.setStrokeWidth(20);
+        paint.setMaskFilter(SkMaskFilter::MakeBlur(kSolid_SkBlurStyle, 35.0f, true));
 
         // Apply the shader to the paint
         paint.setShader(shader);
 
-        std::vector<SkPoint> points(100);
-        for (int i = 0; i < 100; ++i) {
-            float t = i / 99.0f;                                        // Normalize t to range [0, 1]
+        std::vector<SkPoint> points(8);
+        for (int i = 0; i < points.size(); ++i) {
+            float t = i / (float)points.size();                                        // Normalize t to range [0, 1]
             points[i].set(w * t, h/2 + h/2 * sin(2 * M_PI * t)); // Example "S" curve equation
         }
+        // SkPath path3;
+        // path3.moveTo(points[0]);
+        // for (size_t i = 1; i < points.size(); ++i)
+        // {
+        //     path3.lineTo(points[i]);
+        // }
         SkPath path3;
-        path3.moveTo(points[0]);
-        for (size_t i = 1; i < points.size(); ++i)
-        {
-            path3.lineTo(points[i]);
+        for (int i = 0; i < pointsPath.size(); ++i) {
+            if (i == 0) path3.moveTo({pointsPath[0].x, pointsPath[0].y});
+            path3.lineTo({pointsPath[i].x, pointsPath[i].y});
         }
 
+
         // Draw the path with the gradient
-        for (int i =0; i < 3; i++) {
+        for (int i =0; i < 3; i++) 
+        {
             // canvas->drawPath(path, paint);
             // canvas->drawPath(path2, paint);
             canvas->drawPath(path3, paint);
