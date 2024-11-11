@@ -137,13 +137,11 @@ public:
     }
 
     bool cleanDiedSparks(std::chrono::milliseconds t) {
-        while (!m_sparks.empty()) {
-            if (!m_sparks.front().isAlive(t)) {
-                m_sparks.pop_front();
-            }
-            else {
-                break;
-            }
+        auto it = std::find_if(m_sparks.begin(), m_sparks.end(), [&t](const Spark& s) {
+            return s.isAlive(t);
+        });
+        if (it != m_sparks.end()) {
+            m_sparks.erase(m_sparks.begin(), it);
         }
     }
 
@@ -173,13 +171,11 @@ public:
     ~ClusterStorage() = default;
 
     void cleanupDeadClusters() {
-        while (!m_clusters.empty()) {
-            if (!m_clusters.front().isAlive(m_timePoint)) {
-                m_clusters.pop_front();
-            }
-            else {
-                break;
-            }
+        auto it = std::find_if(m_clusters.begin(), m_clusters.end(), [this](const SparkCluster& c) {
+            return c.isAlive(m_timePoint);
+        });
+        if (it != m_clusters.end()) {
+            m_clusters.erase(m_clusters.begin(), it);
         }
 
         for (auto&& c : m_clusters) {

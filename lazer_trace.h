@@ -29,8 +29,18 @@ private:
     struct PointData {
         hmos::Point m_point{};
         std::chrono::milliseconds m_burnTime{};
-        float m_width{};
         float m_maxWidth{};
+
+        float getWidthForTime(const std::chrono::milliseconds& t, bool isLast = false)
+        {
+            auto timePassed = t - m_burnTime;
+            timePassed = std::min(timePassed, SEGMENT_TTL);
+            auto fraction = static_cast<float>(timePassed.count()) / static_cast<float>(SEGMENT_TTL.count());
+            if (!isLast) {
+                fraction = 1.0f - fraction;
+            }
+            return fraction * m_maxWidth;;
+        }
     };
 
 public:
@@ -49,13 +59,13 @@ public:
             
             if (m_points.empty()) {
                 std::cout << "ashim: add first point " << currPoint  << "\n";
-                m_points.emplace_back(PointData{ currPoint, timePoint, SEGMENT_MIN_WIDTH, SEGMENT_MAX_WIDTH });
+                m_points.emplace_back(PointData{ currPoint, timePoint, SEGMENT_MAX_WIDTH });
             } else {
                 std::cout << "ashim: add new point " << currPoint << "\n";
-                auto& lastPoint = m_points.back();
-                m_points.emplace_back(PointData{ currPoint, timePoint, lastPoint.m_width, lastPoint.m_width });
-                std::swap(lastPoint, m_points.back());
-                m_points.back().m_point = currPoint;
+                auto lastPointCopy = m_points.back(); // copy lazer point
+                m_points.back() = PointData{ lastPointCopy.m_point, timePoint, lastPointCopy.getWidthForTime(timePoint, true) };
+                lastPointCopy.m_point = currPoint; // update position for lazer point
+                m_points.emplace_back(std::move(lastPointCopy));
             }
         }
     }
@@ -67,28 +77,11 @@ public:
 
         m_timePoint = timePoint;
 
-        while (m_points.size() > 1) {
-            if ((m_timePoint - m_points.front().m_burnTime) > SEGMENT_TTL) {
-                m_points.pop_front();
-            }
-            else {
-                break;
-            }
-        }
-
-        if (!m_points.empty()) {
-            for (auto i = 0; i < m_points.size(); ++i) {
-                auto timePassed = (m_timePoint - m_points[i].m_burnTime);
-                timePassed = std::min(timePassed, SEGMENT_TTL);
-                auto fraction = 1.0f - static_cast<float>(timePassed.count()) / static_cast<float>(SEGMENT_TTL.count());
-                if (i == m_points.size()-1) {
-                    fraction = 1.0f - fraction;
-                }
-                auto w = fraction * m_points[i].m_maxWidth;
-                std::cout << "ashim: fraction-> " << fraction << "\n";
-                std::cout << "ashim: width-> " << w << "\n";
-                m_points[i].m_width = w;
-            }
+        auto it = std::find_if(m_points.begin(), std::prev(m_points.end()), [this](const PointData& p) {
+            return (m_timePoint - p.m_burnTime) <= SEGMENT_TTL;
+        });
+        if (it != m_points.end()) {
+           m_points.erase(m_points.begin(), it);
         }
     }
 
@@ -97,10 +90,11 @@ public:
         if (fn && !m_points.empty()) {
             for (auto i = 0; i < m_points.size(); ++i) {
                 if (i == m_points.size() - 1) {
-                    // last point (finger position)
-                    fn(m_points[i].m_point, m_points[i].m_point, m_points[i].m_width);
+                    // lazer point head (current finger position)
+                    fn(m_points[i].m_point, m_points[i].m_point, m_points[i].getWidthForTime(m_timePoint, true));
                 } else {
-                    fn(m_points[i].m_point, m_points[i + 1].m_point, m_points[i].m_width);
+                    // lazer point tail
+                    fn(m_points[i].m_point, m_points[i + 1].m_point, m_points[i].getWidthForTime(m_timePoint, false));
                 }
             }
         }
