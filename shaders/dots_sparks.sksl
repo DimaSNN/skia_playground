@@ -1,0 +1,39 @@
+uniform float2 iResolution;
+uniform float2 iMouse;
+uniform float iTime;
+
+half4 main(float2 fragCoord) {
+float2 uv = fragCoord.xy / iResolution.xy;
+float2 mouse = iMouse.xy / iResolution.xy;
+float dist = distance(uv, mouse);
+
+// Initialize the color to black
+half4 color = half4(0.0);
+
+// Number of sparks
+const int numSparks = 10;
+
+// Loop to create multiple sparks
+for (int i = 0; i < numSparks; i++) {
+// Random angle and radius for each spark
+float angle = 6.28318530718 * fract(sin(float(i) * 12.9898 + iTime) * 43758.5453);
+float radius = 0.9 * fract(sin(float(i) * 78.233 + iTime) * 43758.5453);
+
+// Adjust radius to avoid empty circle
+radius *= 0.4 *  fract(sin(float(i) * 93.233 + iTime) * 43758.5453);
+
+// Calculate spark position
+float2 sparkPos = half2(0.5, 0.5) + radius * float2(cos(angle), sin(angle));
+//float2 sparkPos = mouse + radius * float2(0.5, 0.5);
+
+// Calculate the intensity of the spark
+float sparkIntensity = smoothstep(0.001, 0.06, 0.045 - distance(uv, sparkPos));
+
+// Add the spark color
+//color += half4(1.0, 1.0, 0.0, 1.0) * sparkIntensity;
+vec3  rgb = 0.5 + cos(iTime + float3(0.0, 2.0, 4.0));
+color += half4(rgb, 1.0) * sparkIntensity;
+}
+
+return color;
+}

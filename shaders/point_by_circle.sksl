@@ -1,0 +1,47 @@
+half4 main(float2 fragCoord) {
+  float2 uv = fragCoord.xy / iResolution.xy;
+  float2 center = float2(0.5, 0.5); // Center of the screen
+  float circleRadius = 0.4; // Radius of the circular path
+
+  // Initialize the color to black
+  half4 color = half4(0.0);
+
+  // Number of sparks
+  const int numSparks = 1;
+
+  // Precompute constants
+  float invNumSparks = 1.0 / float(numSparks);
+  float twoPi = 6.28318530718;
+  //float dist = distance(uv, vec2(0.2,0.5));
+  //float pointSize = 0.08;
+  //if (dist > 0.7) {
+ //   return half4(0); 
+  //}  
+
+  // Loop to create multiple sparks along the circular path
+  for (int i = 0; i < numSparks; i++) {
+    half iFloat = float(i);
+    half angle = twoPi * iFloat * invNumSparks + iTime;
+    half radius = fract(sin(iFloat * 78.233 + iTime) * 43758.5453);
+    //radius = fract(sin(iFloat * 93.233 + iTime) * 42758.5453);
+
+    half2 sparkPos = center + circleRadius * half2(cos(angle), sin(angle));
+	half dist = distance(uv, sparkPos);
+    //if (dist > 0.05) {
+    // continue; 
+    //}
+    
+    // Calculate the intensity of the spark
+    half sparkIntensity = smoothstep(0.0001, 0.08, 0.05  - dist);
+
+    // Generate random color for the spark with rainbow effect
+    half hue = fract(iFloat * invNumSparks + iTime);
+    half3 rgb = half3(0.7 + 0.5 * cos(6.245646 * hue + half3(0.0, 2.0, 4.0)));
+
+    // Add the spark color
+    color += half4(rgb, 1.0) * sparkIntensity;
+    //color += half4(rgb, 1.0) * (sparkIntensity + vec2(0.2,0.2));
+  }
+
+  return color;
+}
