@@ -31,7 +31,6 @@ private:
         std::chrono::milliseconds m_burnTime{};
         float m_width{};
         float m_maxWidth{};
-        bool m_isInitState;
     };
 
 public:
@@ -50,17 +49,13 @@ public:
             
             if (m_points.empty()) {
                 std::cout << "ashim: add first point " << currPoint  << "\n";
-                m_points.emplace_back(PointData{ currPoint, timePoint, SEGMENT_MIN_WIDTH, SEGMENT_MAX_WIDTH, true });
+                m_points.emplace_back(PointData{ currPoint, timePoint, SEGMENT_MIN_WIDTH, SEGMENT_MAX_WIDTH });
             } else {
                 std::cout << "ashim: add new point " << currPoint << "\n";
                 auto& lastPoint = m_points.back();
-                m_points.emplace_back(PointData{ currPoint, timePoint, lastPoint.m_width, lastPoint.m_width, false });
+                m_points.emplace_back(PointData{ currPoint, timePoint, lastPoint.m_width, lastPoint.m_width });
                 std::swap(lastPoint, m_points.back());
                 m_points.back().m_point = currPoint;
-
-                for (auto& p : m_points) {
-                    std::cout << "ashim: trace point " << p.m_point << "\n";
-                }
             }
         }
     }
@@ -72,13 +67,7 @@ public:
 
         m_timePoint = timePoint;
 
-        // Update last point to prevent from death
-        auto& lastPoint = m_points.back();
-        if (!lastPoint.m_isInitState) {
-            m_points.back().m_burnTime = m_timePoint;
-        }
-
-        while (!m_points.empty()) {
+        while (m_points.size() > 1) {
             if ((m_timePoint - m_points.front().m_burnTime) > SEGMENT_TTL) {
                 m_points.pop_front();
             }
@@ -90,19 +79,14 @@ public:
         if (!m_points.empty()) {
             for (auto i = 0; i < m_points.size(); ++i) {
                 auto timePassed = (m_timePoint - m_points[i].m_burnTime);
+                timePassed = std::min(timePassed, SEGMENT_TTL);
                 auto fraction = 1.0f - static_cast<float>(timePassed.count()) / static_cast<float>(SEGMENT_TTL.count());
-                if (m_points[i].m_isInitState) {
+                if (i == m_points.size()-1) {
                     fraction = 1.0f - fraction;
-                    if (fraction >= 0.99) {
-                        m_points[i].m_isInitState = false;
-                        m_points[i].m_maxWidth = SEGMENT_MAX_WIDTH;
-                        fraction = 1.0;
-                    }
                 }
                 auto w = fraction * m_points[i].m_maxWidth;
                 std::cout << "ashim: fraction-> " << fraction << "\n";
                 std::cout << "ashim: width-> " << w << "\n";
-                std::cout << "ashim: m_isInitState-> " << m_points[i].m_isInitState << "\n";
                 m_points[i].m_width = w;
             }
         }
