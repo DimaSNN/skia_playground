@@ -8,40 +8,49 @@
 #include <algorithm>
 #include <functional>
 #include <iostream>
-#include <deque>
-#include <optional>
+#include <atomic>
 
 
 #include "point.h"
 #include "lazer_trace.h"
+#include "gradient_trace.h"
 #include "spark.h"
-
+#include "path_points_storage.h"
 
 class PathLightEffect {
 
 public:
-    PathLightEffect() = default;
+    PathLightEffect() : 
+        m_gradientTrace{ m_pathStorage }
+    {
+
+    }
     ~PathLightEffect() = default;
+
+    void markClear() {
+        m_toClearFlag.store(true);
+    }
 
     void clear()
     {
         m_clusterStorage.clear();
         m_lazerTrace.clear();
-        m_pathLength = 0.0f;
-        m_lastPoint = std::optional<hmos::Point>{};
+        m_pathStorage.clear();
     }
 
-    void addPoint(std::chrono::milliseconds timePoint, const hmos::Point& currPoint)
+    void addPoints(std::chrono::milliseconds timePoint, const std::vector<hmos::Point>& points)
     {
-        m_clusterStorage.addPoint(timePoint, currPoint);
-        m_lazerTrace.addPoint(timePoint, currPoint);
-
-        if (!m_lastPoint) {
-            m_lastPoint = currPoint;
-            return;
+        if (m_toClearFlag.exchange(false)) {
+            clear();
         }
-        m_pathLength += m_lastPoint->distance(currPoint);
-        m_lastPoint = currPoint;
+
+        for(const auto& p: points) {
+            m_clusterStorage.addPoint(timePoint, p);
+            m_lazerTrace.addPoint(timePoint, p);
+        }
+
+        m_pathStorage.addPoints(points);
+
     }
 
     void onTimeTick(std::chrono::milliseconds timePoint)
@@ -50,23 +59,24 @@ public:
         m_lazerTrace.onTimeTick(timePoint);
     }
 
-    void onDraw(DrawLaszerSegmentFn lazerFn, SparkDrawFn sparkFn)
+    void onDraw(GradientTraceDrawFn gradTraceDraw, DrawLaszerSegmentFn lazerFn, SparkDrawFn sparkFn)
     {
+        m_gradientTrace.onDraw(gradTraceDraw);
         m_lazerTrace.onDraw(lazerFn);
         m_clusterStorage.onDraw(sparkFn);
     }
 
-    float getPathLength()
-    {
-        return m_pathLength;
+    const std::vector<hmos::Point>& getPathPoints() const {
+        return m_pathStorage.getPathPoints();
     }
 
 private:
+    PathPointsStorage m_pathStorage{};
+    std::atomic<bool> m_toClearFlag{false};
+    
     ClusterStorage m_clusterStorage;
     LazerTrace m_lazerTrace;
-
-    std::optional<hmos::Point> m_lastPoint;
-    float m_pathLength;
+    GradientTrace m_gradientTrace;
 };
 
 
