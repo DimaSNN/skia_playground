@@ -55,8 +55,8 @@ class GradientTrace {
 public:
 
     GradientTrace() = delete;
-    GradientTrace(const PathPointsStorage& pointStorage) :
-        m_pointStorage(pointStorage)
+    GradientTrace(PathPointsStorage& pointStorage) :
+        m_pointStorage(&pointStorage)
     {
 
     }
@@ -65,9 +65,9 @@ public:
 
     void onDraw(GradientTraceDrawFn fn)
     {
-        if (fn && !m_pointStorage.empty()) {
-            const auto& points = m_pointStorage.getPathPoints();
-            std::cout << "ashim: PATH_LENGTH-> " << m_pointStorage.getPathLength() << "\n";
+        if (fn && !m_pointStorage->empty()) {
+            const auto& points = m_pointStorage->getPathPoints();
+            std::cout << "ashim: PATH_LENGTH-> " << m_pointStorage->getPathLength() << "\n";
             float dist = 0.0;
             for (int i = 0; i < points.size() - 1; ++i) {
                 hmos::Point p1{ points[i].x,  points[i].y };
@@ -83,7 +83,7 @@ public:
     }
 
 private:
-    const PathPointsStorage& m_pointStorage;
+    PathPointsStorage* m_pointStorage;
 
     ColorType calculateColor(float point_distance) const {
         static auto INTERPOLATOR = [](float _x, float _xa, ColorType colA, float _xb, ColorType colB) {
@@ -94,7 +94,7 @@ private:
         uint8_t g = 0;
         uint8_t b = 0;
         
-        float pathLength = m_pointStorage.getPathLength();
+        float pathLength = m_pointStorage->getPathLength();
         float path_middle = pathLength / 2;
         
         if (point_distance <= path_middle) {

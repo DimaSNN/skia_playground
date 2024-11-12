@@ -12,6 +12,7 @@
 
 
 #include "point.h"
+#include "path_points_storage.h"
 
 
 using speed_vec_t = hmos::Point;
@@ -27,7 +28,7 @@ class LazerTrace {
 
 private:
     struct PointData {
-        hmos::Point m_point{};
+        size_t m_point{0};
         std::chrono::milliseconds m_burnTime{};
         float m_maxWidth{};
 
@@ -45,31 +46,34 @@ private:
 
 public:
 
-    LazerTrace() = default;
-    ~LazerTrace() = default;
+    LazerTrace() = delete;
+    LazerTrace(PathPointsStorage& pointStorage) :
+        m_pointStorage(&pointStorage)
+    {
 
-    void clear() {
-        m_points.clear();
     }
+    ~LazerTrace() = default;
 
     void onComplete()
     {
         m_completeFlag = true;
     }
 
-    void addPoint(std::chrono::milliseconds timePoint, const hmos::Point& currPoint)
+    void onPointsAdded(std::chrono::milliseconds timePoint, size_t startIndex, size_t endIndex)
     {
-        if (m_points.empty() || 
-            (m_points.back().m_point != currPoint && m_points.back().m_point.distance(currPoint) >= MIN_DISTANCE_TO_ADD)) {
-            
+        const auto& pathPoints = m_pointStorage->getPathPoints();
+        for (auto i = startIndex; i <= endIndex; ++i) {
             if (m_points.empty()) {
-                std::cout << "ashim: add first point " << currPoint  << "\n";
-                m_points.emplace_back(PointData{ currPoint, timePoint, SEGMENT_MAX_WIDTH });
-            } else {
-                std::cout << "ashim: add new point " << currPoint << "\n";
+                std::cout << "ashim: add first point " << pathPoints[i] << "\n";
+                std::cout << "ashim: startIndex " << startIndex << "\n";
+                std::cout << "ashim: endIndex " << endIndex << "\n";
+                m_points.emplace_back(PointData{ i, timePoint, SEGMENT_MAX_WIDTH });
+            }
+            else if (pathPoints[m_points.back().m_point] != pathPoints[i] && pathPoints[m_points.back().m_point].distance(pathPoints[i]) >= MIN_DISTANCE_TO_ADD) {
+                std::cout << "ashim: add new point " << pathPoints[i] << "\n";
                 auto lastPointCopy = m_points.back(); // copy lazer point
                 m_points.back() = PointData{ lastPointCopy.m_point, timePoint, lastPointCopy.getWidthForTime(timePoint, true) };
-                lastPointCopy.m_point = currPoint; // update position for lazer point
+                lastPointCopy.m_point = i; // update position for lazer point
                 m_points.emplace_back(std::move(lastPointCopy));
             }
         }
@@ -93,20 +97,25 @@ public:
     void onDraw(DrawLaszerSegmentFn fn)
     {
         if (fn && !m_points.empty()) {
+            const auto& pathPoints = m_pointStorage->getPathPoints();
             for (auto i = 0; i < m_points.size(); ++i) {
                 if (i == m_points.size() - 1) {
                     // lazer point head (current finger position)
                     std::cout << "ashim: draw last " << m_completeFlag << "\n";
-                    fn(m_points[i].m_point, m_points[i].m_point, m_points[i].getWidthForTime(m_timePoint, !m_completeFlag));
+                    const auto& p1 = pathPoints[m_points[i].m_point];
+                    fn(p1, p1, m_points[i].getWidthForTime(m_timePoint, !m_completeFlag));
                 } else {
                     // lazer point tail
-                    fn(m_points[i].m_point, m_points[i + 1].m_point, m_points[i].getWidthForTime(m_timePoint, false));
+                    const auto& p1 = pathPoints[m_points[i].m_point];
+                    const auto& p2 = pathPoints[m_points[i+1].m_point];
+                    fn(p1, p2, m_points[i].getWidthForTime(m_timePoint, false));
                 }
             }
         }
     }
 
 private:
+    PathPointsStorage* m_pointStorage;
     std::deque<PointData> m_points;
     std::chrono::milliseconds m_timePoint; // last time when onTimeTick() was called
     bool m_completeFlag {false}; // user completed trace (mouse up)

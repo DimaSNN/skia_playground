@@ -21,7 +21,8 @@ class PathLightEffect {
 
 public:
     PathLightEffect() : 
-        m_gradientTrace{ m_pathStorage }
+        m_gradientTrace{ m_pathStorage },
+        m_lazerTrace{ m_pathStorage }
     {
 
     }
@@ -41,18 +42,22 @@ public:
         if (m_toResetFlag.exchange(false)) {
             m_pathStorage = PathPointsStorage{};
             m_clusterStorage = ClusterStorage{};
-            m_lazerTrace = LazerTrace{};
+            m_lazerTrace = LazerTrace{ m_pathStorage };
+            m_gradientTrace = GradientTrace{ m_pathStorage };
             m_toCompleteFlag.store(false);
         }
 
         for(const auto& p: points) {
             m_clusterStorage.addPoint(timePoint, p);
-            m_lazerTrace.addPoint(timePoint, p);
         }
 
+        auto startIndex = m_pathStorage.getPathPoints().size();
         m_pathStorage.addPoints(points);
+        m_lazerTrace.onPointsAdded(timePoint, startIndex, startIndex+points.size()-1);
         if (m_toCompleteFlag) {
+            startIndex = m_pathStorage.getPathPoints().size();
             m_pathStorage.addPoints({ m_pathStorage.getPathPoints().front() });
+            m_lazerTrace.onPointsAdded(timePoint, startIndex, startIndex);
         }
     }
 

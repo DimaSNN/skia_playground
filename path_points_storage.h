@@ -45,6 +45,8 @@ public:
         return m_pathPoints.empty();
     }
 
+    
+
     const std::vector<hmos::Point>& getPathPoints() const {
         return m_pathPoints;
     }
