@@ -32,7 +32,144 @@ float distance(float x1, float y1, float x2, float y2) {
     return std::sqrt(std::pow(x2 - x1, 2) + std::pow(y2 - y1, 2));
 }
 
+template <typename T>
+T midpoint(const T& a, const T& b) {
+    return a + (b - a) / 2;
+}
 
+std::vector<std::pair<size_t, size_t>> prepareDiapasons(size_t vectorSize)
+{
+    size_t partSize = vectorSize / 4;
+    size_t remainder = vectorSize % 4;
+
+    std::vector<std::pair<size_t, size_t>> diapasons(4);
+    size_t startIndex = 0;
+
+    for (int i = 0; i < 4; ++i)
+    {
+        size_t endIndex = startIndex + partSize + (i < remainder ? 1 : 0);
+        diapasons[i] = {startIndex, endIndex};
+        startIndex = endIndex;
+    }
+
+    return diapasons;
+}
+
+std::pair<std::vector<SkPoint>, std::vector<std::pair<size_t, size_t>>>  generateCornersPoints(float x1, float y1, float x2, float y2, int n)
+{
+    if (n < 12) {
+        std::cout << "requested too small points n \n";
+        return {}; 
+    }
+
+    std::vector<SkPoint> points;
+    points.reserve(n);
+    const float zoom = 1.7;
+
+    float centerX = (x1 + x2) / 2;
+    float centerY = (y1 + y2) / 2;
+    float radiusX = std::abs(x2 - x1) / 2;
+    float radiusY = std::abs(y2 - y1) / 2;
+    radiusX *= zoom;
+    radiusY *= zoom;
+
+    printf("centerX %.4f \n", centerX);
+    printf("centerY %.4f \n", centerY);
+    printf("radiusX %.4f \n", radiusX);
+    printf("radiusY %.4f \n", radiusY);
+
+
+    const auto intervals = prepareDiapasons(n);
+    const float length = 40.0;
+    float offset = length;
+    const float div  = (float) n / 4;
+    for (int i = intervals[0].first; i < intervals[0].second; ++i) {
+        int mid = midpoint(intervals[0].first, intervals[0].second);
+        float x,y;
+        if (i == mid) {
+            x = centerX - radiusX;
+            y = centerY - radiusY;
+        } else if (i < mid) {
+            x = centerX - radiusX;
+            y = centerY - radiusY + offset;
+            offset -= offset / div;
+        } else {
+            x = centerX - radiusX + offset;
+            y = centerY - radiusY;
+            offset += offset / div;
+        }
+        points.emplace_back(SkPoint::Make(x, y));
+    }
+    offset = length;
+    for (int i = intervals[1].first; i < intervals[1].second; ++i) {
+        int mid =  midpoint(intervals[1].first, intervals[1].second);
+        float x,y;
+        if (i == mid) {
+            x = centerX + radiusX;
+            y = centerY - radiusY;
+        } else if (i < mid) {
+            x = centerX + radiusX - offset;
+            y = centerY - radiusY;
+            offset -= offset / div;
+        } else {
+            x = centerX + radiusX;
+            y = centerY - radiusY + offset;
+            offset += offset / div;
+        }
+        points.emplace_back(SkPoint::Make(x, y));
+    }
+    offset = length;
+    for (int i = intervals[2].first; i < intervals[2].second; ++i) {
+        int mid = midpoint(intervals[2].first, intervals[2].second);
+        float x,y;
+        if (i == mid) {
+            x = centerX + radiusX;
+            y = centerY + radiusY;
+        } else if (i < mid) {
+            x = centerX + radiusX;
+            y = centerY + radiusY - offset;
+            offset -= offset / div;
+        } else {
+            x = centerX + radiusX - offset;
+            y = centerY + radiusY;
+            offset += offset / div;
+        }
+        points.emplace_back(SkPoint::Make(x, y));
+    }
+    offset = length;
+    for (int i = intervals[3].first; i < intervals[3].second; ++i) {
+        int mid = midpoint(intervals[3].first, intervals[3].second);
+        float x,y;
+        if (i == mid) {
+            x = centerX - radiusX;
+            y = centerY + radiusY;
+        } else if (i < mid) {
+            x = centerX - radiusX + offset;
+            y = centerY + radiusY;
+            offset -= offset / div;
+        } else {
+            x = centerX - radiusX;
+            y = centerY + radiusY - offset;
+            offset += offset / div;
+        }
+        points.emplace_back(SkPoint::Make(x, y));
+    }
+
+    if (points.size() != n) {
+        std::cout << "error: calculated edges size too low, n: " << points.size() << std::endl;
+        // return {};
+    }
+    //Debug
+    for (int i =0; i < points.size() ; i++) {
+        if (i % 5 == 0) {
+            printf("\n");
+        }
+        printf("{ x: %.3f y: %.3f } \t", points[i].x(), points[i].y());
+        
+    }
+    printf("\n");
+    return {points, intervals};
+}
 
 
 std::vector<SkPoint> generateEllipsePoints(float x1, float y1, float x2, float y2, int n)
@@ -80,12 +217,12 @@ bool rotateTargetContur(const std::vector<SkPoint>& base, std::vector<SkPoint>& 
     }
     const auto sz = static_cast<int>(base.size());
 
-    if (isClockwise(base)) {
+    if (isClockwise(base) != isClockwise(target)) {
         std::cout << "target contour is different rotation \n";
         std::reverse(target.begin(), target.end());
     }
 
-    std::pair<float, int> minEl{ __FLT_MAX__, 0 };
+    std::pair<float, int> minEl{ std::numeric_limits<float>::max(), 0 };
     for (int k = 0; k <  sz; k++) { // k is an offset to use target[] as a circular buffer
         std::pair<float, int> currVal{ 0.0, k };
         int i = 0;
@@ -104,25 +241,6 @@ bool rotateTargetContur(const std::vector<SkPoint>& base, std::vector<SkPoint>& 
 
     return true;
 }
-
-// const std::string skslCode = R"(
-//         uniform vec2 iResolution;
-//         uniform float iTime;
-//         mediump vec4 main(vec2 drawing_coord)
-//         {
-//             // return vec4(1,0,0,1);
-
-//             float pct = 0.0;
-//             vec2 uv = drawing_coord.xy / iResolution.xy;
-//             vec2 tC = vec2(0.5)-uv;
-//             pct = sqrt(tC.x*tC.x+tC.y*tC.y);
-//             float alpha = smoothstep(0.5, 0.0, pct)+0.2;
-//             float cl = pct*0.5;
-//             vec4 fragColor = vec4(vec3(cl), alpha);
-//             return fragColor;
-
-//         }
-//     )";
 
 
 //magic line
@@ -173,90 +291,43 @@ half4 main(float2 fragCoord) {
 }
 )";
 
-//for path
-const std::string pathShader = R"(
-    uniform float2 iResolution;
-    //uniform float2 iMouse;
-    uniform float iTime;
 
-    //uniform float2 iResolution;
-//uniform float2 iMouse;
-//uniform float iTime;
-
-    half4 main(float2 fragCoord) {
-        float2 uv = fragCoord.xy / iResolution.xy;
-
-        // Initialize the color to black
-        half4 color = half4(0.0);
-
-        // Number of sparks
-        const int numSparks = 10;
-
-        // Loop to create multiple sparks
-        for (int i = 0; i < numSparks; i++) {
-            // Random angle and radius for each spark
-            float angle = 6.28318530718 * fract(sin(float(i) * 12.9898 + iTime) * 43758.5453);
-            float radius = 0.9 * fract(sin(float(i) * 78.233 + iTime) * 43758.5453);
-
-            // Adjust radius to avoid empty circle
-            radius *= 0.4 *  fract(sin(float(i) * 93.233 + iTime) * 43758.5453);
-
-            // Calculate spark position
-            float2 sparkPos = half2(0.5, 0.5) + radius * float2(cos(angle), sin(angle));
-            //float2 sparkPos = mouse + radius * float2(0.5, 0.5);
-
-            // Calculate the intensity of the spark
-            float sparkIntensity = smoothstep(0.001, 0.06, 0.045 - distance(uv, sparkPos));
-
-            // Add the spark color
-            //color += half4(1.0, 1.0, 0.0, 1.0) * sparkIntensity;
-            vec3  rgb = 0.5 + cos(iTime + float3(0.0, 2.0, 4.0));
-            color += half4(rgb, 1.0) * sparkIntensity;
-        }
-
-        return color;
-    }
-)";
-
-// const std::string skslCode = R"(
-//     // SkSL code for animated darkening towards the center
-//     uniform float2 iResolution; // Canvas resolution
-//     uniform float iTime;        // Time variable for animation
-
-//     half4 main(float2 fragCoord) {
-//     // Normalize coordinates
-//     float2 uv = float2(fragCoord.xy / iResolution.xy);
-//     uv = uv * 2.0 - 1.0; // Transform to range [-1, 1]
-
-//     // Calculate distance from center
-//     float dist = 1.0 - length(uv) * length(uv);
-
-//     // Brightening factor with animation
-//     float brighten = 1 * dist * smoothstep(0.0, 1.0, iTime);
-
-//     // Apply brightening effect
-//     return half4(1.0 - brighten, 1.0 - brighten, 1.0 - brighten, 0.5);
-//     }
-// )";
 struct Pos{ float x; float y;};
-// struct PosInt{ int x; int y;};
 
 std::vector<SkPoint> pointsPath;
 
-struct Elipsis {
-    struct Interpolation { float val = 0.0; float speed = 0.1; };
-    std::vector<SkPoint> v;
-    Interpolation interp;
-    SkPath elipsisPath;
+struct InterpolatingFigure {
+    float interpolationSpeed = 0.1;
+    float ellipsisInterpVal = 0.0;
+    float cornersInterpVal = 0.0;
+    std::vector<SkPoint> elipsisPathTarget; //generated points
+    SkPath elipsisPathBegin;
     SkPath elipsisPathInterpolated;
 
-    void Step() {
-        if (interp.val < 1.0) {
-            interp.val += interp.speed;
+    std::vector<std::pair<size_t, size_t>> cornersIntervals; //4 pairs of diapasons
+    std::vector<SkPath> cornersPathsBegin;
+    std::vector<SkPath> cornersPathsEnd;
+    std::vector<SkPath> cornersPathsInterpolated;
+    // SkPath cornersPathInterpolated;
+
+    void ElipsisStep() {
+        if (ellipsisInterpVal < 1.0) {
+            ellipsisInterpVal += interpolationSpeed;
         }
     }
+    bool isEllipsisDone() {
+        return ellipsisInterpVal >= 1.0;
+    }
+    void CornersStep() {
+        if (cornersInterpVal < 1.0) {
+            cornersInterpVal += interpolationSpeed;
+        }
+    }
+    bool isCornersDone() {
+        return cornersInterpVal >= 1.0;
+    }
 };
-Elipsis elipsis;
+InterpolatingFigure elipsis;
 
 
 struct Ranges{int minX=0, minY=0, maxX=0, maxY=0;};
@@ -279,7 +350,7 @@ void handlePanEvent(SDL_Event &event)
         ranges = Ranges{evt.x, evt.y, evt.x, evt.y};
         pointsPath.reserve(1000);
         pointsPath.emplace_back(SkPoint::Make(evt.x, evt.y));
-        elipsis = Elipsis{};
+        elipsis = InterpolatingFigure{};
 
         break;
     }
@@ -313,13 +384,13 @@ void handlePanEvent(SDL_Event &event)
             // pointsPath.push_back(pointsPath[0]);
             // std::cout << "Closing path, pointsPath::size: " << pointsPath.size() << "\n";
             std::cout << "Path is OK, pointsPath::size: " << pointsPath.size() << "\n";
-            elipsis.v = generateEllipsePoints(ranges.minX, ranges.minY, ranges.maxX, ranges.maxY, pointsPath.size());
-            rotateTargetContur(pointsPath, elipsis.v);
+            elipsis.elipsisPathTarget = generateEllipsePoints(ranges.minX, ranges.minY, ranges.maxX, ranges.maxY, pointsPath.size());
+            rotateTargetContur(pointsPath, elipsis.elipsisPathTarget);
         } else {
             std::cout << "Should clean path here \n";
             pointsPath.clear();
         }
-        ranges = Ranges{};
+        // ranges = Ranges{};
         break;
     }
     default:
@@ -544,37 +615,73 @@ int main(int argc, char *argv[])
             }
 
 
-            // Draw the path with the gradient
-            for (int i = 0; i < 3; i++) 
-            {
-                canvas->drawPath(path3, paint);
-            }
 
-            if (!elipsis.v.empty() && elipsis.elipsisPath.isEmpty()) {
+            if (elipsis.isCornersDone()) {
+                for (auto& path : elipsis.cornersPathsEnd) {
+                    canvas->drawPath(path, paint);
+                }
+            } else if (!elipsis.cornersPathsEnd.empty()) {
+                std::cout << "!elipsis.cornersPathsEnd.empty() " << std::endl;
+                for (int i = 0; i < 4; i++) {
+                    SkPath interp;
+                    elipsis.cornersPathsEnd[i].interpolate(elipsis.cornersPathsBegin[i], elipsis.cornersInterpVal, &interp);
+                    elipsis.cornersPathsInterpolated[i] = std::move(interp);
+                    canvas->drawPath(interp, paint);
+                }
+                elipsis.CornersStep();
+            } else if (elipsis.isEllipsisDone()) {
+                std::cout << "generateCornersPoints start " << std::endl;
+                auto [points, intervals] = generateCornersPoints(ranges.minX, ranges.minY, ranges.maxX, ranges.maxY, elipsis.elipsisPathTarget.size());
+                bool rotationStatus = rotateTargetContur(points, elipsis.elipsisPathTarget);
+                // bool rotationStatus = rotateTargetContur(elipsis.elipsisPathTarget, points);
+                std::cout << "Rotation corners status: " << std::boolalpha << rotationStatus << std::endl;
+
+
+                for (const auto& it : intervals) {
+                    int j = it.first;
+                    SkPath corner;
+                    SkPath arc;
+                    corner.moveTo(points[j]);
+                    arc.moveTo(elipsis.elipsisPathTarget[j]);
+                    for (j++; j < it.second; j++) {
+                        // SkPath interp;
+                        corner.lineTo(points[j]);
+                        arc.lineTo(elipsis.elipsisPathTarget[j]);
+                    }
+                    elipsis.cornersPathsEnd.push_back(std::move(corner));
+                    elipsis.cornersPathsBegin.push_back(std::move(arc));
+                    elipsis.cornersPathsInterpolated = elipsis.cornersPathsBegin;
+                }
+                elipsis.cornersIntervals = std::move(intervals);
+                std::cout << "generateCornersPoints end " << std::endl;
+            } else if (!elipsis.elipsisPathInterpolated.isEmpty()) {
+                SkPath interp;
+                elipsis.elipsisPathBegin.interpolate(path3, elipsis.ellipsisInterpVal, &interp);
+                elipsis.ElipsisStep();
+                elipsis.elipsisPathInterpolated = std::move(interp);
+                canvas->drawPath(elipsis.elipsisPathInterpolated, paint);
+            } else if (!elipsis.elipsisPathTarget.empty()) {
                 std::cout << "!elipsis.empty() " << std::endl;
 
                 SkPath elipsisPath;
-                elipsisPath.moveTo(elipsis.v[0]);
-                for (auto&& p : elipsis.v) {
+                elipsisPath.moveTo(elipsis.elipsisPathTarget[0]);
+                for (auto&& p : elipsis.elipsisPathTarget) {
                     elipsisPath.lineTo(p);
                 }
                 // elipsisPath.close();
-                elipsis.elipsisPath = std::move(elipsisPath);
-                canvas->drawPath(elipsis.elipsisPath, paint);
-
-            } else if (!elipsis.elipsisPath.isEmpty()) {
-                SkPath interp;
-                elipsis.elipsisPath.interpolate(path3, elipsis.interp.val, &interp);
-                elipsis.Step();
-                elipsis.elipsisPathInterpolated = std::move(interp);
-
-                canvas->drawPath(elipsis.elipsisPathInterpolated, paint);
+                elipsis.elipsisPathBegin = elipsisPath;
+                elipsis.elipsisPathInterpolated = elipsisPath;
+                // canvas->drawPath(elipsis.elipsisPathInterpolated, paint);
+            } else {
+                // Draw the path with the gradient
+                for (int i = 0; i < 3; i++) 
+                {
+                    canvas->drawPath(path3, paint);
+                }
             }
         }
 
         /////////////////////
-        
-        
 
 
         context->flushAndSubmit();
