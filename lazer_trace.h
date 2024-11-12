@@ -11,7 +11,6 @@
 #include <deque>
 
 
-#include "point.h"
 #include "path_points_storage.h"
 
 
@@ -115,6 +114,9 @@ public:
     }
 
 private:
+    /*
+    Use points storage to avoid copy
+    */
     PathPointsStorage* m_pointStorage;
     std::deque<PointData> m_points;
     std::chrono::milliseconds m_timePoint; // last time when onTimeTick() was called

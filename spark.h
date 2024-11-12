@@ -11,7 +11,7 @@
 #include <deque>
 
 
-#include "point.h"
+#include "path_points_storage.h"
 
 class Spark;
 
@@ -79,8 +79,8 @@ public:
     ~SparkCluster() = default;
     
     SparkCluster() = default;
-    SparkCluster(std::chrono::milliseconds t, hmos::Point p) :
-        m_point(std::move(p)),
+    SparkCluster(std::chrono::milliseconds t, size_t p) :
+        m_point(p),
         m_burnTime(std::move(t))
     {
 
@@ -123,14 +123,15 @@ public:
         return true;
     }
 
-    bool checkForCross(const SparkCluster& other) const
+    bool checkForCross(const PathPointsStorage& storage, const SparkCluster& other) const
     {
-        return checkForCross(other.m_point);
+        return checkForCross(storage, other.m_point);
     }
 
-    bool checkForCross(const hmos::Point& otherPoint) const
+    bool checkForCross(const PathPointsStorage& pointStorage, size_t p2) const
     {
-        if (otherPoint.distance(m_point) < CLUSTER_RADIUS) {
+        const auto& pathPoints = pointStorage.getPathPoints();
+        if (pathPoints[p2].distance(pathPoints[m_point]) < CLUSTER_RADIUS) {
             return true;
         }
         return false;
@@ -154,7 +155,7 @@ public:
         return m_burnTime;
     }
 
-    const hmos::Point& getPosition() const
+    size_t getPosition() const
     {
         return m_point;
     }
@@ -162,12 +163,17 @@ public:
 private:   
     std::chrono::milliseconds m_burnTime{ 0 }; // when the cluster was created
     std::deque<Spark> m_sparks; // created sparks which are exist (active)
-    hmos::Point m_point{ 0.0f, 0.0f }; // the cluster position
+    size_t m_point; // the cluster position (index in PathPointsStorage)
 };
 
 class ClusterStorage {
 public:
-    ClusterStorage() = default;
+    ClusterStorage() = delete;
+    ClusterStorage(PathPointsStorage& pointStorage) :
+        m_pointStorage(&pointStorage)
+    {
+
+    }
     ~ClusterStorage() = default;
 
     void cleanupDeadClusters() {
@@ -194,6 +200,7 @@ public:
                 m_clusters.back().updateTime(m_timePoint);
             }
 
+            const auto& pathPoints = m_pointStorage->getPathPoints();
             for (auto i = 0; i < m_clusters.size(); ++i) {
                 auto& cluster = m_clusters[i];
                 auto sparksCnt = cluster.shouldCreateSpark(m_timePoint);
@@ -202,22 +209,25 @@ public:
                     if (i == m_clusters.size()-1 && m_clusters.size() > 2) {
                         auto& prevCluster = m_clusters[i-1];
                         auto timeLeft = cluster.getCreationTime() - prevCluster.getCreationTime();
-                        auto speedX = (cluster.getPosition().x - prevCluster.getPosition().x) / timeLeft.count();
-                        auto speedY = (cluster.getPosition().y - prevCluster.getPosition().y) / timeLeft.count();
+                        auto speedX = (pathPoints[cluster.getPosition()].x - pathPoints[prevCluster.getPosition()].x) / timeLeft.count();
+                        auto speedY = (pathPoints[cluster.getPosition()].y - pathPoints[prevCluster.getPosition()].y) / timeLeft.count();
                         static constexpr float MAGIC_ADJUST = 60.0f;
                         s = { (speedX) / MAGIC_ADJUST , (speedY) / MAGIC_ADJUST }; // Try to normalize to 0.1
                     }
-                    cluster.createSpark(sparksCnt, cluster.getPosition(), m_timePoint, s);
+                    cluster.createSpark(sparksCnt, pathPoints[cluster.getPosition()], m_timePoint, s);
                 }
             }
         }
     }
 
-    void addPoint(std::chrono::milliseconds timePoint, const hmos::Point& currPoint)
+    void onPointsAdded(std::chrono::milliseconds timePoint, size_t startIndex, size_t endIndex)
     {
-        if (m_clusters.empty() || m_clusters.back().checkForCross(currPoint) == false) {
-            // no clusters or we far from previous cluster - create new one
-            m_clusters.emplace_back(timePoint, currPoint);
+        const auto& pathPoints = m_pointStorage->getPathPoints();
+        for (auto i = startIndex; i <= endIndex; ++i) {
+            if (m_clusters.empty() || m_clusters.back().checkForCross(*m_pointStorage, i) == false) {
+                // no clusters or we far from previous cluster - create new one
+                m_clusters.emplace_back(timePoint, i);
+            }
         }
     }
 
@@ -240,6 +250,10 @@ public:
     }
 
 private:
+    /*
+    Use points storage to avoid copy
+    */
+    PathPointsStorage* m_pointStorage;
     std::deque<SparkCluster> m_clusters; // collection of clusters
     std::chrono::milliseconds m_timePoint; // last time when onTimeTick() was called
     bool m_completeFlag{ false }; // user completed trace (mouse up)

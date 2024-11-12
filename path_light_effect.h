@@ -22,7 +22,8 @@ class PathLightEffect {
 public:
     PathLightEffect() : 
         m_gradientTrace{ m_pathStorage },
-        m_lazerTrace{ m_pathStorage }
+        m_lazerTrace{ m_pathStorage },
+        m_clusterStorage{ m_pathStorage }
     {
 
     }
@@ -41,23 +42,22 @@ public:
     {
         if (m_toResetFlag.exchange(false)) {
             m_pathStorage = PathPointsStorage{};
-            m_clusterStorage = ClusterStorage{};
+            m_clusterStorage = ClusterStorage{ m_pathStorage };
             m_lazerTrace = LazerTrace{ m_pathStorage };
             m_gradientTrace = GradientTrace{ m_pathStorage };
             m_toCompleteFlag.store(false);
         }
 
-        for(const auto& p: points) {
-            m_clusterStorage.addPoint(timePoint, p);
-        }
-
         auto startIndex = m_pathStorage.getPathPoints().size();
+        auto endIndex = startIndex + points.size() - 1;
         m_pathStorage.addPoints(points);
-        m_lazerTrace.onPointsAdded(timePoint, startIndex, startIndex+points.size()-1);
+        m_lazerTrace.onPointsAdded(timePoint, startIndex, endIndex);
+        m_clusterStorage.onPointsAdded(timePoint, startIndex, endIndex);
         if (m_toCompleteFlag) {
-            startIndex = m_pathStorage.getPathPoints().size();
+            startIndex = endIndex++;
             m_pathStorage.addPoints({ m_pathStorage.getPathPoints().front() });
             m_lazerTrace.onPointsAdded(timePoint, startIndex, startIndex);
+            m_clusterStorage.onPointsAdded(timePoint, startIndex, startIndex);
         }
     }
 
@@ -84,6 +84,10 @@ public:
     }
 
 private:
+    /*
+    Use points storage to avoid copy
+    Note: the consumers store only indexes and expect that storage will be only grow!
+    */
     PathPointsStorage m_pathStorage{};
     std::atomic<bool> m_toResetFlag{false};
     std::atomic<bool> m_toCompleteFlag{ false };

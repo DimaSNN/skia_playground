@@ -83,6 +83,9 @@ public:
     }
 
 private:
+    /*
+    Use points storage to avoid copy
+    */
     PathPointsStorage* m_pointStorage;
 
     ColorType calculateColor(float point_distance) const {
