@@ -10,6 +10,8 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <limits>
+#include <mutex>
 
 #include "include/gpu/ganesh/GrDirectContext.h"
 #include "include/gpu/ganesh/gl/GrGLDirectContext.h"
@@ -22,8 +24,85 @@
 // #include "include/gpu/gl/GrGLInterface.h"
 // #include "include/core/SkSurface.h"
 
+// Atomic flag to control the event polling thread
+std::atomic<bool> running(true);
+std::mutex mainLoopMutex;
+
 float distance(float x1, float y1, float x2, float y2) {
     return std::sqrt(std::pow(x2 - x1, 2) + std::pow(y2 - y1, 2));
+}
+
+
+
+
+std::vector<SkPoint> generateEllipsePoints(float x1, float y1, float x2, float y2, int n)
+{
+    std::vector<SkPoint> points;
+    points.reserve(n);
+    const float zoom = 1.7;
+
+    float centerX = (x1 + x2) / 2;
+    float centerY = (y1 + y2) / 2;
+    float radiusX = std::abs(x2 - x1) / 2;
+    float radiusY = std::abs(y2 - y1) / 2;
+    radiusX *= zoom;
+    radiusY *= zoom;
+
+    for (int i = 0; i < n; ++i)
+    {
+        float angle = 2 * M_PI * i / n;
+        float x = centerX + radiusX * std::cos(angle);
+        float y = centerY + radiusY * std::sin(angle);
+        points.emplace_back(SkPoint::Make(x, y));
+    }
+
+    return points;
+}
+
+bool isClockwise(const std::vector<SkPoint>& points) {
+    float sum = 0.0f;
+    size_t n = points.size();
+
+    for (size_t i = 0; i < n; ++i) {
+        const SkPoint& p1 = points[i];
+        const SkPoint& p2 = points[(i + 1) % n];
+        sum += (p2.x() - p1.x()) * (p2.y() + p1.y());
+    }
+
+    return sum > 0;
+}
+
+bool rotateTargetContur(const std::vector<SkPoint>& base, std::vector<SkPoint>& target)
+{
+    if (base.size() != target.size()) {
+        std::cout << "Error, sizes are not equal \n";
+        return false; 
+    }
+    const auto sz = static_cast<int>(base.size());
+
+    if (isClockwise(base)) {
+        std::cout << "target contour is different rotation \n";
+        std::reverse(target.begin(), target.end());
+    }
+
+    std::pair<float, int> minEl{ __FLT_MAX__, 0 };
+    for (int k = 0; k <  sz; k++) { // k is an offset to use target[] as a circular buffer
+        std::pair<float, int> currVal{ 0.0, k };
+        int i = 0;
+        int j = i + k;
+        for(; i < sz; ++i,++j) {
+            currVal.first += SkPoint::Distance(base[i], target[j % sz]);
+        }
+
+        if (minEl.first > currVal.first) {
+            minEl = currVal;
+        }
+    }
+    
+    printf("rotating on %d items \n", minEl.second);
+    std::rotate(target.begin(), std::next(target.begin(), minEl.second), target.end());
+
+    return true;
 }
 
 // const std::string skslCode = R"(
@@ -160,9 +239,25 @@ const std::string pathShader = R"(
 //     }
 // )";
 struct Pos{ float x; float y;};
-struct PosInt{ int x; int y;};
+// struct PosInt{ int x; int y;};
 
-std::vector<PosInt> pointsPath;
+std::vector<SkPoint> pointsPath;
+
+struct Elipsis {
+    struct Interpolation { float val = 0.0; float speed = 0.1; };
+    std::vector<SkPoint> v;
+    Interpolation interp;
+    SkPath elipsisPath;
+    SkPath elipsisPathInterpolated;
+
+    void Step() {
+        if (interp.val < 1.0) {
+            interp.val += interp.speed;
+        }
+    }
+};
+Elipsis elipsis;
+
 
 struct Ranges{int minX=0, minY=0, maxX=0, maxY=0;};
 Ranges ranges;
@@ -171,7 +266,9 @@ Ranges ranges;
 // Function to handle pan events
 void handlePanEvent(SDL_Event &event)
 {
+
     static bool panStarted = false;
+    std::lock_guard lock(mainLoopMutex);
     switch (event.type)
     {
     case SDL_MOUSEBUTTONDOWN: {
@@ -181,15 +278,17 @@ void handlePanEvent(SDL_Event &event)
         pointsPath.clear();
         ranges = Ranges{evt.x, evt.y, evt.x, evt.y};
         pointsPath.reserve(1000);
-        pointsPath.emplace_back(PosInt{evt.x, evt.y});
+        pointsPath.emplace_back(SkPoint::Make(evt.x, evt.y));
+        elipsis = Elipsis{};
+
         break;
     }
     case SDL_MOUSEMOTION: {
         const SDL_MouseMotionEvent& evt = event.motion;
         std::cout << "Pan updated to (x:" << evt.x << ", y:" << evt.y << ")\n";
         if (panStarted) {
-            if (distance(pointsPath.rbegin()->x, pointsPath.rbegin()->y, evt.x, evt.y) > 10.0) {
-                pointsPath.emplace_back(PosInt{evt.x, evt.y});
+            if (distance(pointsPath.rbegin()->x(), pointsPath.rbegin()->y(), evt.x, evt.y) > 10.0) {
+                pointsPath.emplace_back(SkPoint::Make(evt.x, evt.y));
                 ranges.minX = std::min(evt.x, ranges.minX);
                 ranges.minY = std::min(evt.y, ranges.minY);
                 ranges.maxX = std::max(evt.x, ranges.maxX);
@@ -209,10 +308,13 @@ void handlePanEvent(SDL_Event &event)
         if ((sz > 10)
         && (deltaX > 10.0 && deltaY > 10.0)
         && (coeff < 2.0)
-        && (std::min(deltaX, deltaY) > (distance(pointsPath[0].x, pointsPath[0].y, pointsPath.rbegin()->x, pointsPath.rbegin()->y) / 10.0)))
+        && (std::min(deltaX, deltaY) > (distance(pointsPath[0].x(), pointsPath[0].y(), pointsPath.rbegin()->x(), pointsPath.rbegin()->y()) / 10.0)))
         {
-            pointsPath.push_back(pointsPath[0]);
-            std::cout << "Closing path, pointsPath::size: " << pointsPath.size() << "\n";
+            // pointsPath.push_back(pointsPath[0]);
+            // std::cout << "Closing path, pointsPath::size: " << pointsPath.size() << "\n";
+            std::cout << "Path is OK, pointsPath::size: " << pointsPath.size() << "\n";
+            elipsis.v = generateEllipsePoints(ranges.minX, ranges.minY, ranges.maxX, ranges.maxY, pointsPath.size());
+            rotateTargetContur(pointsPath, elipsis.v);
         } else {
             std::cout << "Should clean path here \n";
             pointsPath.clear();
@@ -225,8 +327,7 @@ void handlePanEvent(SDL_Event &event)
     }
 }
 
-// Atomic flag to control the event polling thread
-std::atomic<bool> running(true);
+
 
 void PollEvents()
 {
@@ -234,7 +335,8 @@ void PollEvents()
     while (running)
     {
         while (SDL_PollEvent(&event))
-        {
+        {   
+           
             // Handle events here
             switch(event.type) {
             case SDL_QUIT: 
@@ -330,6 +432,7 @@ int main(int argc, char *argv[])
     while (running)
     {
         std::chrono::duration<float, std::milli> time{ std::chrono::steady_clock::now() - start };
+        
         // float period = 2000.0;
         // if (time > decltype(time){period}) {
         //     start = std::chrono::steady_clock::now(); //reset
@@ -362,7 +465,7 @@ int main(int argc, char *argv[])
         // builder.uniform("u_resolution") = SkV2{w, h};
         // builder.uniform("u_time") = time.count() / period;
 
-        std::cout << "time: " << time.count() / 1000 << std::endl;
+        // std::cout << "time: " << time.count() / 1000 << std::endl;
         // std::cout << "iTime: " << time.count() / period << std::endl;
 
         auto shader = builder.makeShader();
@@ -432,20 +535,41 @@ int main(int argc, char *argv[])
         // {
         //     path3.lineTo(points[i]);
         // }
-        SkPath path3;
-        for (int i = 0; i < pointsPath.size(); ++i) {
-            if (i == 0) path3.moveTo({pointsPath[0].x, pointsPath[0].y});
-            path3.lineTo({pointsPath[i].x, pointsPath[i].y});
-        }
-
-
-        // Draw the path with the gradient
-        for (int i =0; i < 3; i++) 
         {
-            // canvas->drawPath(path, paint);
-            // canvas->drawPath(path2, paint);
-            canvas->drawPath(path3, paint);
+            std::lock_guard lock(mainLoopMutex);
+            SkPath path3;
+            for (int i = 0; i < pointsPath.size(); ++i) {
+                if (i == 0) path3.moveTo({pointsPath[0].x(), pointsPath[0].y()});
+                path3.lineTo({pointsPath[i].x(), pointsPath[i].y()});
+            }
 
+
+            // Draw the path with the gradient
+            for (int i = 0; i < 3; i++) 
+            {
+                canvas->drawPath(path3, paint);
+            }
+
+            if (!elipsis.v.empty() && elipsis.elipsisPath.isEmpty()) {
+                std::cout << "!elipsis.empty() " << std::endl;
+
+                SkPath elipsisPath;
+                elipsisPath.moveTo(elipsis.v[0]);
+                for (auto&& p : elipsis.v) {
+                    elipsisPath.lineTo(p);
+                }
+                // elipsisPath.close();
+                elipsis.elipsisPath = std::move(elipsisPath);
+                canvas->drawPath(elipsis.elipsisPath, paint);
+
+            } else if (!elipsis.elipsisPath.isEmpty()) {
+                SkPath interp;
+                elipsis.elipsisPath.interpolate(path3, elipsis.interp.val, &interp);
+                elipsis.Step();
+                elipsis.elipsisPathInterpolated = std::move(interp);
+
+                canvas->drawPath(elipsis.elipsisPathInterpolated, paint);
+            }
         }
 
         /////////////////////
