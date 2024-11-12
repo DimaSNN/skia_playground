@@ -31,12 +31,12 @@ private:
         std::chrono::milliseconds m_burnTime{};
         float m_maxWidth{};
 
-        float getWidthForTime(const std::chrono::milliseconds& t, bool isLast = false)
+        float getWidthForTime(const std::chrono::milliseconds& t, bool toGrow = true)
         {
             auto timePassed = t - m_burnTime;
             timePassed = std::min(timePassed, SEGMENT_TTL);
             auto fraction = static_cast<float>(timePassed.count()) / static_cast<float>(SEGMENT_TTL.count());
-            if (!isLast) {
+            if (!toGrow) {
                 fraction = 1.0f - fraction;
             }
             return fraction * m_maxWidth;;
@@ -97,17 +97,19 @@ public:
     {
         if (fn && !m_points.empty()) {
             const auto& pathPoints = m_pointStorage->getPathPoints();
+            auto mainPointIndex = m_points.size() - 1;
+            auto mainPointWidth = m_points[mainPointIndex].getWidthForTime(m_timePoint, !m_completeFlag);
+            float widthStep = mainPointWidth / m_points.size();
             for (auto i = 0; i < m_points.size(); ++i) {
-                if (i == m_points.size() - 1) {
+                const auto& p1 = pathPoints[m_points[i].m_point];
+                if (i == mainPointIndex) {
                     // lazer point head (current finger position)
-                    std::cout << "ashim: draw last " << m_completeFlag << "\n";
-                    const auto& p1 = pathPoints[m_points[i].m_point];
-                    fn(p1, p1, m_points[i].getWidthForTime(m_timePoint, !m_completeFlag));
-                } else {
+                    fn(p1, p1, mainPointWidth);
+                }
+                else {
                     // lazer point tail
-                    const auto& p1 = pathPoints[m_points[i].m_point];
-                    const auto& p2 = pathPoints[m_points[i+1].m_point];
-                    fn(p1, p2, m_points[i].getWidthForTime(m_timePoint, false));
+                    const auto& p2 = pathPoints[m_points[i + 1].m_point];
+                    fn(p1, p2, widthStep * i);
                 }
             }
         }

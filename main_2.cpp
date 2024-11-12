@@ -210,7 +210,7 @@ void handlePanEvent(SDL_Event &event)
         if (panStarted) {
             auto p = hmos::Point{ evt.x, evt.y };
             std::unique_lock l(gPointsMutex);
-            if (!gLastPoint || gLastPoint->distance(p) >= 20.0) {
+            if (!gLastPoint || gLastPoint->distance(p) >= 10.0) {
                 gLastPoint = p;
                 gTmpPoints.emplace_back(p);
                 ranges.minX = std::min(evt.x, ranges.minX);
