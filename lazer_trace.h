@@ -52,6 +52,11 @@ public:
         m_points.clear();
     }
 
+    void onComplete()
+    {
+        m_completeFlag = true;
+    }
+
     void addPoint(std::chrono::milliseconds timePoint, const hmos::Point& currPoint)
     {
         if (m_points.empty() || 
@@ -91,7 +96,8 @@ public:
             for (auto i = 0; i < m_points.size(); ++i) {
                 if (i == m_points.size() - 1) {
                     // lazer point head (current finger position)
-                    fn(m_points[i].m_point, m_points[i].m_point, m_points[i].getWidthForTime(m_timePoint, true));
+                    std::cout << "ashim: draw last " << m_completeFlag << "\n";
+                    fn(m_points[i].m_point, m_points[i].m_point, m_points[i].getWidthForTime(m_timePoint, !m_completeFlag));
                 } else {
                     // lazer point tail
                     fn(m_points[i].m_point, m_points[i + 1].m_point, m_points[i].getWidthForTime(m_timePoint, false));
@@ -103,6 +109,7 @@ public:
 private:
     std::deque<PointData> m_points;
     std::chrono::milliseconds m_timePoint; // last time when onTimeTick() was called
+    bool m_completeFlag {false}; // user completed trace (mouse up)
 };
 
 

@@ -190,7 +190,9 @@ public:
         cleanupDeadClusters();
 
         if (!m_clusters.empty()) {
-            m_clusters.back().updateTime(m_timePoint);
+            if (!m_completeFlag) {
+                m_clusters.back().updateTime(m_timePoint);
+            }
 
             for (auto i = 0; i < m_clusters.size(); ++i) {
                 auto& cluster = m_clusters[i];
@@ -219,11 +221,6 @@ public:
         }
     }
 
-
-    void clear() {
-        m_clusters.clear();
-    }
-
     void onDraw(SparkDrawFn fn) {
         if (fn) {
             for (auto&& c : m_clusters) {
@@ -237,9 +234,15 @@ public:
         }
     }
 
+    void onComplete()
+    {
+        m_completeFlag = true;
+    }
+
 private:
     std::deque<SparkCluster> m_clusters; // collection of clusters
     std::chrono::milliseconds m_timePoint; // last time when onTimeTick() was called
+    bool m_completeFlag{ false }; // user completed trace (mouse up)
 };
 
 #endif

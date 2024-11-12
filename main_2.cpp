@@ -191,7 +191,7 @@ void handlePanEvent(SDL_Event &event)
         panStarted = true;
         ranges = Ranges{ evt.x, evt.y, evt.x, evt.y };
 
-        gPathLightEffect.markClear();
+        gPathLightEffect.markToReset();
 
         {
             std::unique_lock l(gPointsMutex);
@@ -229,7 +229,7 @@ void handlePanEvent(SDL_Event &event)
             std::unique_lock l(gPointsMutex);
             gLastPoint = hmos::Point{ evt.x, evt.y };
             gTmpPoints.emplace_back(*gLastPoint);
-            gTmpPoints.emplace_back(*gFirstPoint);
+            gPathLightEffect.markToComplete();
         }
         ranges = Ranges{};
         break;
@@ -481,6 +481,7 @@ int main(int argc, char *argv[])
             lazerPaint.setAntiAlias(true);
             lazerPaint.setColor(SkColorSetARGB(0xFF, 0x99, 0xff, 0xff));
             lazerPaint.setStrokeCap(SkPaint::kRound_Cap);
+            lazerPaint.setStyle(SkPaint::kStroke_Style);
             lazerPaint.setMaskFilter(SkMaskFilter::MakeBlur(kSolid_SkBlurStyle, 20.0f, true));
             auto lazerDraw = [&canvas, &lazerPaint](const hmos::Point& pStart, const hmos::Point& pEnd, float width) {
                 std::cout << "ashim: draw point-> " << pStart << pEnd << "\n";
@@ -489,14 +490,7 @@ int main(int argc, char *argv[])
                 SkPath lazerPath;
                 lazerPath.moveTo(pStart.x, pStart.y);
                 lazerPath.lineTo(pEnd.x, pEnd.y);
-                if (pStart == pEnd) {
-                    lazerPaint.setStyle(SkPaint::kFill_Style);
-                    canvas->drawCircle(pStart.x, pStart.y, width / 2, lazerPaint);
-                }
-                else {
-                    lazerPaint.setStyle(SkPaint::kStroke_Style);
-                    canvas->drawPath(lazerPath, lazerPaint);
-                }
+                canvas->drawPath(lazerPath, lazerPaint);
             };
 
             SkPaint sparkPaint;

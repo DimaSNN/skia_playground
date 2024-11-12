@@ -27,21 +27,22 @@ public:
     }
     ~PathLightEffect() = default;
 
-    void markClear() {
-        m_toClearFlag.store(true);
+    void markToReset() {
+        m_toResetFlag.store(true);
     }
 
-    void clear()
+    void markToComplete()
     {
-        m_clusterStorage.clear();
-        m_lazerTrace.clear();
-        m_pathStorage.clear();
+        m_toCompleteFlag.store(true);
     }
 
     void addPoints(std::chrono::milliseconds timePoint, const std::vector<hmos::Point>& points)
     {
-        if (m_toClearFlag.exchange(false)) {
-            clear();
+        if (m_toResetFlag.exchange(false)) {
+            m_pathStorage = PathPointsStorage{};
+            m_clusterStorage = ClusterStorage{};
+            m_lazerTrace = LazerTrace{};
+            m_toCompleteFlag.store(false);
         }
 
         for(const auto& p: points) {
@@ -50,11 +51,18 @@ public:
         }
 
         m_pathStorage.addPoints(points);
-
+        if (m_toCompleteFlag) {
+            m_pathStorage.addPoints({ m_pathStorage.getPathPoints().front() });
+        }
     }
 
     void onTimeTick(std::chrono::milliseconds timePoint)
     {
+        if (m_toCompleteFlag) {
+            m_lazerTrace.onComplete();
+            m_clusterStorage.onComplete();
+        }
+
         m_clusterStorage.onTimeTick(timePoint);
         m_lazerTrace.onTimeTick(timePoint);
     }
@@ -72,7 +80,8 @@ public:
 
 private:
     PathPointsStorage m_pathStorage{};
-    std::atomic<bool> m_toClearFlag{false};
+    std::atomic<bool> m_toResetFlag{false};
+    std::atomic<bool> m_toCompleteFlag{ false };
     
     ClusterStorage m_clusterStorage;
     LazerTrace m_lazerTrace;
