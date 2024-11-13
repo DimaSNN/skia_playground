@@ -59,8 +59,8 @@ public:
         return m_ranges;
     }
 
-    void swapStorage(std::vector<hmos::Point>& rhs) noexcept {
-        std::swap(m_pathPoints, rhs);
+    void swapStorage(std::vector<hmos::Point>& points) noexcept {
+        std::swap(m_pathPoints, points);
     }
 
 private:

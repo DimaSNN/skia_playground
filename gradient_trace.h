@@ -65,21 +65,25 @@ public:
 
     void onDraw(GradientTraceDrawFn fn)
     {
-        if (fn && !m_pointStorage->empty()) {
-            const auto& points = m_pointStorage->getPathPoints();
-            std::cout << "ashim: PATH_LENGTH-> " << m_pointStorage->getPathLength() << "\n";
-            float dist = 0.0;
-            for (int i = 0; i < points.size() - 1; ++i) {
-                hmos::Point p1{ points[i].x,  points[i].y };
-                hmos::Point p2{ points[i + 1].x,  points[i + 1].y };
-                auto p1p2dist = p1.distance(p2);
-                std::cout << "ashim: points-> " << p1 << p2 << "\n";
-                std::cout << "ashim: p1_dist-> " << dist << "\n";
-                std::cout << "ashim: p2_dist-> " << (dist + p1p2dist) << "\n";
-                fn(p1, calculateColor(dist), p2, calculateColor(dist + p1p2dist), SEGMENT_WIDTH);
-                dist += p1p2dist;
-            }
+        if (fn) {
+            const hmos::Point p{ 0,  0 };
+            fn(p, 0, p, 0, SEGMENT_WIDTH);
         }
+        // if (fn && !m_pointStorage->empty()) {
+        //     const auto& points = m_pointStorage->getPathPoints();
+        //     std::cout << "ashim: PATH_LENGTH-> " << m_pointStorage->getPathLength() << "\n";
+        //     float dist = 0.0;
+        //     for (int i = 0; i < points.size() - 1; ++i) {
+        //         hmos::Point p1{ points[i].x,  points[i].y };
+        //         hmos::Point p2{ points[i + 1].x,  points[i + 1].y };
+        //         auto p1p2dist = p1.distance(p2);
+        //         std::cout << "ashim: points-> " << p1 << p2 << "\n";
+        //         std::cout << "ashim: p1_dist-> " << dist << "\n";
+        //         std::cout << "ashim: p2_dist-> " << (dist + p1p2dist) << "\n";
+        //         fn(p1, calculateColor(dist), p2, calculateColor(dist + p1p2dist), SEGMENT_WIDTH);
+        //         dist += p1p2dist;
+        //     }
+        // }
     }
 
 private:

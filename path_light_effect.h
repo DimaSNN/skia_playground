@@ -98,6 +98,16 @@ public:
         return m_pathStorage.getPathPoints();
     }
 
+    std::vector<std::pair<size_t, size_t>>  getDiapasons() const {
+        // bool status;
+        auto [status, diapasons] = m_contourTransformator.GetDiapasons();
+        if (status) {
+            return diapasons;
+        } else {
+            return {{ 0, getPathPoints().size() }};
+        }
+    }
+
 private:
     /*
     Use points storage to avoid copy

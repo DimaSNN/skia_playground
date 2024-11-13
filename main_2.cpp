@@ -11,6 +11,7 @@
 #include <thread>
 #include <vector>
 #include <mutex>
+#include <algorithm>
 
 #include "include/gpu/ganesh/GrDirectContext.h"
 #include "include/gpu/ganesh/gl/GrGLDirectContext.h"
@@ -20,8 +21,10 @@
 #include "include/effects/SkGradientShader.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkBlurTypes.h"
+#include "include/core/SkTileMode.h"
 
 #include "path_light_effect.h"
+#include "contour_transformator.h"
 
 // #include "include/gpu/gl/GrGLInterface.h"
 // #include "include/core/SkSurface.h"
@@ -30,6 +33,40 @@ float distance(float x1, float y1, float x2, float y2) {
     return std::sqrt(std::pow(x2 - x1, 2) + std::pow(y2 - y1, 2));
 }
 
+float calculateAngle(const hmos::Point& point, const hmos::Point& center) {
+    float deltaX = point.x - center.x;
+    float deltaY = point.y - center.y;
+    float angle = std::atan2(deltaY, deltaX); // Angle in radians
+
+    float angleInDegrees = angle * 180.0 / M_PI;
+
+    return angleInDegrees;
+}
+
+float calculateArcLength(float angleStart, float angleEnd, const hmos::Point& center, bool isClockwise) {
+    // Normalize angles to the range [0, 360)
+    angleStart = std::fmod(angleStart, 360.0f);
+    if (angleStart < 0)
+        angleStart += 360.0f;
+
+    angleEnd = std::fmod(angleEnd, 360.0f);
+    if (angleEnd < 0)
+        angleEnd += 360.0f;
+
+    // Calculate the angle difference
+    float angleDifference;
+    if (isClockwise) {
+        angleDifference = angleStart - angleEnd;
+        if (angleDifference < 0)
+            angleDifference += 360.0f;
+    } else {
+        angleDifference = angleEnd - angleStart;
+        if (angleDifference < 0)
+            angleDifference += 360.0f;
+    }
+
+    return angleDifference;
+}
 
 //for path
 const std::string pathShader = R"(
@@ -347,19 +384,21 @@ int main(int argc, char *argv[])
         std::chrono::duration<float, std::milli> time{ GetCurrentTime ()};
 
         //SKIA start
-        context->resetContext();
+        // context->resetContext();
         canvas->clear(SK_ColorBLACK);
 
         std::vector<hmos::Point> newPoints;
+        hmos::Ranges newRanges;
         {
             std::unique_lock l(gPointsMutex);
             std::swap(newPoints, gTmpPoints);
+            newRanges = ranges;
         }
 
 
         if (!newPoints.empty()) {
             std::chrono::milliseconds curr_time{ static_cast<int>(time.count()) };
-            gPathLightEffect.addPoints(curr_time, newPoints, ranges);
+            gPathLightEffect.addPoints(curr_time, newPoints, newRanges);
         }
 
         const auto& pointsPath = gPathLightEffect.getPathPoints();
@@ -369,6 +408,19 @@ int main(int argc, char *argv[])
             std::chrono::milliseconds curr_time{ static_cast<int>(time.count()) };
             gPathLightEffect.onTimeTick(curr_time);
 
+
+
+        //    static sk_sp<SkShader> MakeSweep(SkScalar cx, SkScalar cy,
+        //                              const SkColor4f colors[],
+        //                               sk_sp<SkColorSpace> colorSpace,
+        //                              const SkScalar pos[],
+        //                               int count,
+        //                              SkTileMode mode,
+        //                              SkScalar startAngle, SkScalar endAngle,
+        //                              uint32_t flags,
+        //  const SkMatrix* localMatrix);
+
+
             SkPaint gradientTracePaint;
             gradientTracePaint.setMaskFilter(SkMaskFilter::MakeBlur(kSolid_SkBlurStyle, 20.0f));
             gradientTracePaint.setAntiAlias(true);
@@ -376,17 +428,68 @@ int main(int argc, char *argv[])
             gradientTracePaint.setStrokeCap(SkPaint::kRound_Cap);
             gradientTracePaint.setStrokeWidth(20);
 
-            auto gradientTraceDraw = [&canvas, &gradientTracePaint](const hmos::Point& p1, const ColorType& c1, const hmos::Point& p2, const ColorType& c2, float width) {
-                SkPath path;
-                SkScalar positions[] = { 0.0, 1.0 };
-                SkPoint pts[] = { {p1.x, p1.y}, {p2.x, p2.y} };
-                SkColor colors[] = { c1, c2 };
-                auto shader = SkGradientShader::MakeLinear(pts, colors, positions, 2, SkTileMode::kClamp, 0, NULL);
-                gradientTracePaint.setShader(shader);
-                path.moveTo(p1.x, p1.y);
-                path.lineTo(p2.x, p2.y);
-                canvas->drawPath(path, gradientTracePaint);
-                canvas->drawPath(path, gradientTracePaint);
+            auto gradientTraceDraw = [&canvas, &gradientTracePaint, &gPathLightEffect, &newRanges](const hmos::Point& p1, const ColorType& c1, const hmos::Point& p2, const ColorType& c2, float width) {
+                // SkPath path;
+                // SkScalar positions[] = { 0.0, 1.0 };
+                // SkPoint pts[] = { {p1.x, p1.y}, {p2.x, p2.y} };
+                // SkColor colors[] = { c1, c2 };
+                // auto shader = SkGradientShader::MakeLinear(pts, colors, positions, 2, SkTileMode::kClamp, 0, NULL);
+                // gradientTracePaint.setShader(shader);
+                // path.moveTo(p1.x, p1.y);
+                // path.lineTo(p2.x, p2.y);
+                // canvas->drawPath(path, gradientTracePaint);
+                // canvas->drawPath(path, gradientTracePaint);
+
+                //DIMAS's path approach
+                SkScalar centerX = (newRanges.minX + newRanges.maxX) / 2;
+                SkScalar centerY = (newRanges.minY + newRanges.maxY) / 2;
+                float radiusX = std::abs(newRanges.maxX - newRanges.minX) / 2;
+                float radiusY = std::abs(newRanges.maxY - newRanges.minY) / 2;
+                const SkColor4f colorsCW[] = {
+                    SkColor4f::FromColor(SK_ColorCYAN),
+                    SkColor4f::FromColor(SK_ColorRED),
+                    SkColor4f::FromColor(SK_ColorGREEN),
+                    SkColor4f::FromColor(SK_ColorYELLOW),
+                    SkColor4f::FromColor(SK_ColorCYAN)
+                };
+                const SkColor4f colorsCCW[] = { 
+                    SkColor4f::FromColor(SK_ColorCYAN),
+                    SkColor4f::FromColor(SK_ColorGREEN),
+                    SkColor4f::FromColor(SK_ColorYELLOW),
+                    SkColor4f::FromColor(SK_ColorRED),
+                    SkColor4f::FromColor(SK_ColorCYAN)
+                };
+                const SkScalar pos[] = {0.1, 1, 1, 1, 0.1};
+                const auto& pointsPath = gPathLightEffect.getPathPoints();
+                bool isClockwise = hmos::ContourTransformator::isClockwise(pointsPath);
+                const SkColor4f* colors = colorsCW;
+                if (isClockwise) {
+                    colors = colorsCCW;
+                }
+                SkScalar startAngle = calculateAngle(*(pointsPath.begin()), {centerX, centerY});
+                SkScalar endAngle = calculateAngle(*(pointsPath.rbegin()), {centerX, centerY});
+                SkScalar rotateAngle = isClockwise ? endAngle : startAngle ;
+                float arcLen = calculateArcLength(startAngle, endAngle, {centerX, centerY}, isClockwise);
+                arcLen = std::clamp<float>(5, 360, arcLen);
+                printf("DIMAS startAngle %f, endAngle %f rotateAngle %f  arcLen %f\n", startAngle, endAngle, rotateAngle, arcLen);
+                SkMatrix m; //rotation matrix
+                m.setRotate(rotateAngle, centerX, centerY);
+                // SkPaint paint;
+                gradientTracePaint.setShader(SkGradientShader::MakeSweep(centerX, centerY, colors, nullptr, nullptr, std::size(colorsCW), SkTileMode::kClamp, 0, arcLen, 0, &m));
+                gradientTracePaint.setMaskFilter(SkMaskFilter::MakeBlur(kSolid_SkBlurStyle, 15.0f));
+                // canvas->drawPaint(paint); //dbg drawing
+                
+
+                auto diapasons = gPathLightEffect.getDiapasons();
+                for (auto d : diapasons) {
+                    SkPath simplePath;
+                    simplePath.moveTo(pointsPath[d.first].x, pointsPath[d.first].y);
+                    for (int i = d.first; i < d.second; ++i) {
+                        simplePath.lineTo(pointsPath[i].x, pointsPath[i].y);
+                    }
+                    canvas->drawPath(simplePath, gradientTracePaint);
+                }
+
             };
 
             SkPaint lazerPaint;
