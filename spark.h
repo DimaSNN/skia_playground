@@ -38,13 +38,12 @@ public:
 
     ~Spark() = default;
     Spark() = default;
-    Spark(radius_t r, std::chrono::milliseconds t, hmos::Point p, speed_vec_t s) :
-        m_point(std::move(p)),
-        m_speed(std::move(s)),
-        m_radius(std::move(r)),
-        m_burnTime(std::move(t))
+    Spark(radius_t r, std::chrono::milliseconds t, hmos::Point p, speed_vec_t s)
     {
-
+        m_point = std::move(p);
+        m_speed = std::move(s);
+        m_radius = std::move(r);
+        m_burnTime = std::move(t);
     }
 
     hmos::Point calcPosition(std::chrono::milliseconds t) const
@@ -79,11 +78,10 @@ public:
     ~SparkCluster() = default;
     
     SparkCluster() = default;
-    SparkCluster(std::chrono::milliseconds t, size_t p) :
-        m_point(p),
-        m_burnTime(std::move(t))
+    SparkCluster(std::chrono::milliseconds t, size_t p)
     {
-
+        m_point  = p;
+        m_burnTime = std::move(t);
     }
 
     bool isAlive(std::chrono::milliseconds t) const
@@ -137,7 +135,7 @@ public:
         return false;
     }
 
-    bool cleanDiedSparks(std::chrono::milliseconds t) {
+    void cleanDiedSparks(std::chrono::milliseconds t) {
         auto it = std::find_if(m_sparks.begin(), m_sparks.end(), [&t](const Spark& s) {
             return s.isAlive(t);
         });
@@ -169,10 +167,9 @@ private:
 class ClusterStorage {
 public:
     ClusterStorage() = delete;
-    ClusterStorage(PathPointsStorage& pointStorage) :
-        m_pointStorage(&pointStorage)
+    ClusterStorage(PathPointsStorage& pointStorage)
     {
-
+         m_pointStorage = &pointStorage;
     }
     ~ClusterStorage() = default;
 
@@ -223,10 +220,11 @@ public:
     void onPointsAdded(std::chrono::milliseconds timePoint, size_t startIndex, size_t endIndex)
     {
         const auto& pathPoints = m_pointStorage->getPathPoints();
+        std::chrono::milliseconds ms{1};
         for (auto i = startIndex; i <= endIndex; ++i) {
             if (m_clusters.empty() || m_clusters.back().checkForCross(*m_pointStorage, i) == false) {
                 // no clusters or we far from previous cluster - create new one
-                m_clusters.emplace_back(timePoint, i);
+                m_clusters.emplace_back(timePoint - (++ms), i);
             }
         }
     }
