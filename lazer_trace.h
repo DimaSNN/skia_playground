@@ -29,7 +29,6 @@ private:
     struct PointData {
         size_t m_point{0};
         std::chrono::milliseconds m_burnTime{};
-        float m_maxWidth{};
 
         float getWidthForTime(const std::chrono::milliseconds& t, bool toGrow = true)
         {
@@ -39,7 +38,7 @@ private:
             if (!toGrow) {
                 fraction = 1.0f - fraction;
             }
-            return fraction * m_maxWidth;;
+            return fraction * SEGMENT_MAX_WIDTH;;
         }
     };
 
@@ -66,14 +65,16 @@ public:
                 std::cout << "ashim: add first point " << pathPoints[i] << "\n";
                 std::cout << "ashim: startIndex " << startIndex << "\n";
                 std::cout << "ashim: endIndex " << endIndex << "\n";
-                m_points.emplace_back(PointData{ i, timePoint, SEGMENT_MAX_WIDTH });
+                m_points.emplace_back(PointData{ i, timePoint });
             }
             else if (pathPoints[m_points.back().m_point] != pathPoints[i] && pathPoints[m_points.back().m_point].distance(pathPoints[i]) >= MIN_DISTANCE_TO_ADD) {
                 std::cout << "ashim: add new point " << pathPoints[i] << "\n";
-                auto lastPointCopy = m_points.back(); // copy lazer point
-                m_points.back() = PointData{ lastPointCopy.m_point, timePoint, lastPointCopy.getWidthForTime(timePoint, true) };
-                lastPointCopy.m_point = i; // update position for lazer point
-                m_points.emplace_back(std::move(lastPointCopy));
+               // auto lastPointCopy = m_points.back(); // copy lazer point
+                //m_points.back() = PointData{ lastPointCopy.m_point, timePoint };
+                //lastPointCopy.m_point = i; // update position for lazer point
+                auto timeCopy = m_points.back().m_burnTime;
+                m_points.back().m_burnTime = timePoint;
+                m_points.emplace_back(PointData{ i, timeCopy });
             }
         }
     }
