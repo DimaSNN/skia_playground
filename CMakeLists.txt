@@ -8,8 +8,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g")
 
-set(SKIA_DIR "/home/ashimgaev/git/skia")
-# set(SKIA_DIR "./skia")
+# set(SKIA_DIR "/home/ashimgaev/git/skia")
+set(SKIA_DIR "./skia")
 
 # Find the Skia library
 find_library(SKIA_LIBRARY skia PATHS ${SKIA_DIR}/out/Shared)
