@@ -206,6 +206,7 @@ public:
                     if (i == m_clusters.size()-1 && m_clusters.size() > 2) {
                         auto& prevCluster = m_clusters[i-1];
                         auto timeLeft = cluster.getCreationTime() - prevCluster.getCreationTime();
+                        timeLeft = std::max(timeLeft, std::chrono::milliseconds{1});
                         auto speedX = (pathPoints[cluster.getPosition()].x - pathPoints[prevCluster.getPosition()].x) / timeLeft.count();
                         auto speedY = (pathPoints[cluster.getPosition()].y - pathPoints[prevCluster.getPosition()].y) / timeLeft.count();
                         static constexpr float MAGIC_ADJUST = 60.0f;
@@ -220,11 +221,10 @@ public:
     void onPointsAdded(std::chrono::milliseconds timePoint, size_t startIndex, size_t endIndex)
     {
         const auto& pathPoints = m_pointStorage->getPathPoints();
-        std::chrono::milliseconds ms{1};
         for (auto i = startIndex; i <= endIndex; ++i) {
             if (m_clusters.empty() || m_clusters.back().checkForCross(*m_pointStorage, i) == false) {
                 // no clusters or we far from previous cluster - create new one
-                m_clusters.emplace_back(timePoint - (++ms), i);
+                m_clusters.emplace_back(timePoint, i);
             }
         }
     }
