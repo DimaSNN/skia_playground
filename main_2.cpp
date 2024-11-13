@@ -30,73 +30,6 @@ float distance(float x1, float y1, float x2, float y2) {
     return std::sqrt(std::pow(x2 - x1, 2) + std::pow(y2 - y1, 2));
 }
 
-// const std::string skslCode = R"(
-//         uniform vec2 iResolution;
-//         uniform float iTime;
-//         mediump vec4 main(vec2 drawing_coord)
-//         {
-//             // return vec4(1,0,0,1);
-
-//             float pct = 0.0;
-//             vec2 uv = drawing_coord.xy / iResolution.xy;
-//             vec2 tC = vec2(0.5)-uv;
-//             pct = sqrt(tC.x*tC.x+tC.y*tC.y);
-//             float alpha = smoothstep(0.5, 0.0, pct)+0.2;
-//             float cl = pct*0.5;
-//             vec4 fragColor = vec4(vec3(cl), alpha);
-//             return fragColor;
-
-//         }
-//     )";
-
-
-//magic line
-const std::string skslCode = R"(
-uniform float2 iResolution;
-uniform float iTime;
-// uniform half2 positions[50];
-
-
-half4 main(float2 fragCoord) {
-	float2 uv = fragCoord.xy / iResolution.xy;
-	float2 center = float2(0.5, 0.5); // Center of the screen
-	float circleRadius = 0.4; // Radius of the circular path
-
-	// Initialize the color to black
-	half4 color = half4(0.0);
-
-	// Number of sparks
-	const int numSparks = 100;
-
-
-	  
-	// Loop to create multiple sparks along the circular path
-	for (int i = 0; i < numSparks; i++) {
-		float radius = 0.2 * fract(sin(float(i) * 78.233 + iTime) * 43758.5453);
-		// Adjust radius to avoid empty circle
-		radius *= fract(sin(float(i) * 93.233 + iTime) * 42758.5453);
-		// Calculate angle for each spark along the circle
-		float angle = 6.28318 * float(i) / float(numSparks);
-		float2 tmpCenter = center;
-		//tmpCenter += float2(radius, radius);
-		float2 sparkPos = tmpCenter + circleRadius * float2(cos(angle + iTime),  sin(angle + iTime));
-
-		  
-		// Calculate the intensity of the spark
-		float sparkIntensity = smoothstep(0.0001, 0.08, 0.05 - distance(uv, sparkPos));
-		//float sparkIntensity = smoothstep(0.0011, 0.005, 0.005 - distance(uv, sparkPos));
-
-		// Generate random color for the spark with rainbow effect
-		float hue = fract(float(i) / float(numSparks) + iTime );
-		half3 rgb = half3(0.7 + 0.5 * cos(6.245646 * hue + float3(0.0, 2.0, 4.0)));
-
-		// Add the spark color
-		color += half4(rgb, 1.0) * sparkIntensity;
-	}
-
-	return color;
-}
-)";
 
 //for path
 const std::string pathShader = R"(
@@ -143,28 +76,8 @@ const std::string pathShader = R"(
     }
 )";
 
-// const std::string skslCode = R"(
-//     // SkSL code for animated darkening towards the center
-//     uniform float2 iResolution; // Canvas resolution
-//     uniform float iTime;        // Time variable for animation
-
-//     half4 main(float2 fragCoord) {
-//     // Normalize coordinates
-//     float2 uv = float2(fragCoord.xy / iResolution.xy);
-//     uv = uv * 2.0 - 1.0; // Transform to range [-1, 1]
-
-//     // Calculate distance from center
-//     float dist = 1.0 - length(uv) * length(uv);
-
-//     // Brightening factor with animation
-//     float brighten = 1 * dist * smoothstep(0.0, 1.0, iTime);
-
-//     // Apply brightening effect
-//     return half4(1.0 - brighten, 1.0 - brighten, 1.0 - brighten, 0.5);
-//     }
-// )";
+hmos::Ranges ranges;
 struct Pos{ float x; float y;};
-struct PosInt{ int x; int y;};
 
 
 std::mutex gPointsMutex;
@@ -174,8 +87,7 @@ std::optional<hmos::Point> gFirstPoint;
 
 PathLightEffect gPathLightEffect;
 
-struct Ranges{int minX=0, minY=0, maxX=0, maxY=0;};
-Ranges ranges;
+
 
 
 
@@ -189,7 +101,7 @@ void handlePanEvent(SDL_Event &event)
         const SDL_MouseButtonEvent& evt = event.button;
         //std::cout << "Pan started at (x:" << evt.x << ", y:" << evt.y << ")\n";
         panStarted = true;
-        ranges = Ranges{ evt.x, evt.y, evt.x, evt.y };
+        ranges = hmos::Ranges{ evt.x, evt.y, evt.x, evt.y }; //it's resetting here
 
         gPathLightEffect.markToReset();
 
@@ -228,10 +140,10 @@ void handlePanEvent(SDL_Event &event)
         {
             std::unique_lock l(gPointsMutex);
             gLastPoint = hmos::Point{ evt.x, evt.y };
-            gTmpPoints.emplace_back(*gLastPoint);
+            // gTmpPoints.emplace_back(*gLastPoint);
             gPathLightEffect.markToComplete();
         }
-        ranges = Ranges{};
+        // ranges = hmos::Ranges{};
         break;
     }
     default:
@@ -447,7 +359,7 @@ int main(int argc, char *argv[])
 
         if (!newPoints.empty()) {
             std::chrono::milliseconds curr_time{ static_cast<int>(time.count()) };
-            gPathLightEffect.addPoints(curr_time, newPoints);
+            gPathLightEffect.addPoints(curr_time, newPoints, ranges);
         }
 
         const auto& pointsPath = gPathLightEffect.getPathPoints();

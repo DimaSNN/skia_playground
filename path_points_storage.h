@@ -27,9 +27,10 @@ public:
         m_pathLength = 0.0;
     }
 
-    void addPoints(const std::vector<hmos::Point>& points)
+    void addPoints(const std::vector<hmos::Point>& points, hmos::Ranges ranges)
     {
-        for (const auto& p: points) {
+        m_ranges = std::move(ranges);
+                for (const auto& p: points) {
             if (!m_pathPoints.empty()) {
                 m_pathLength += m_pathPoints.back().distance(p);
             }
@@ -38,7 +39,6 @@ public:
         
         // TBD: improve
         //m_pathPoints.insert(m_pathPoints.end(), points.begin(), points.end());
-
     }
 
     bool empty() const {
@@ -55,8 +55,17 @@ public:
         return m_pathLength;
     }
 
+    const hmos::Ranges& getRanges() const {
+        return m_ranges;
+    }
+
+    void swapStorage(std::vector<hmos::Point>& rhs) noexcept {
+        std::swap(m_pathPoints, rhs);
+    }
+
 private:
     std::vector<hmos::Point> m_pathPoints;
+    hmos::Ranges m_ranges;
     float m_pathLength = 0.0f;
 };
 

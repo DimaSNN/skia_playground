@@ -6,6 +6,7 @@
 
 namespace hmos {
 
+struct Ranges{ int minX=0, minY=0, maxX=0, maxY=0; };
 struct Point {
 public:
     using speed_type_t = float; 

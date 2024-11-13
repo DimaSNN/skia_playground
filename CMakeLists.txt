@@ -9,6 +9,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g")
 
 set(SKIA_DIR "/home/ashimgaev/git/skia")
+# set(SKIA_DIR "./skia")
 
 # Find the Skia library
 find_library(SKIA_LIBRARY skia PATHS ${SKIA_DIR}/out/Shared)
@@ -31,7 +32,7 @@ include_directories(${SDL2_INCLUDE_DIRS})
 # include_directories(${skia_BINARY_DIR})
 
 # Add your source files
-add_executable(SkiaPlayground main_2.cpp spark.cpp point.cpp)
+add_executable(SkiaPlayground main_2.cpp spark.cpp point.cpp contour_transformator.cpp)
 target_include_directories(SkiaPlayground PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 
 set(CMAKE_BUILD_TYPE Debug)
