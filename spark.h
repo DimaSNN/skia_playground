@@ -206,10 +206,12 @@ public:
                     if (i == m_clusters.size()-1 && m_clusters.size() > 2) {
                         auto& prevCluster = m_clusters[i-1];
                         auto timeLeft = cluster.getCreationTime() - prevCluster.getCreationTime();
-                        timeLeft = std::max(timeLeft, std::chrono::milliseconds{1});
+                        if (timeLeft.count() <= 0) {
+                            timeLeft = std::chrono::milliseconds{1};
+                        }
                         auto speedX = (pathPoints[cluster.getPosition()].x - pathPoints[prevCluster.getPosition()].x) / timeLeft.count();
                         auto speedY = (pathPoints[cluster.getPosition()].y - pathPoints[prevCluster.getPosition()].y) / timeLeft.count();
-                        static constexpr float MAGIC_ADJUST = 60.0f;
+                        static constexpr float MAGIC_ADJUST = 600.0f; // The speedX and speedY are up to 60 during experement. TBD: to normalize
                         s = { (speedX) / MAGIC_ADJUST , (speedY) / MAGIC_ADJUST }; // Try to normalize to 0.1
                     }
                     cluster.createSpark(sparksCnt, pathPoints[cluster.getPosition()], m_timePoint, s);
