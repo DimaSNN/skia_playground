@@ -24,6 +24,51 @@
 // #include "include/gpu/gl/GrGLInterface.h"
 // #include "include/core/SkSurface.h"
 
+//for path
+const std::string pathShader = R"(
+    uniform float2 iResolution;
+    //uniform float2 iMouse;
+    uniform float iTime;
+
+    //uniform float2 iResolution;
+//uniform float2 iMouse;
+//uniform float iTime;
+
+    half4 main(float2 fragCoord) {
+        float2 uv = fragCoord.xy / iResolution.xy;
+
+        // Initialize the color to black
+        half4 color = half4(0.0);
+
+        // Number of sparks
+        const int numSparks = 10;
+
+        // Loop to create multiple sparks
+        for (int i = 0; i < numSparks; i++) {
+            // Random angle and radius for each spark
+            float angle = 6.28318530718 * fract(sin(float(i) * 12.9898 + iTime) * 43758.5453);
+            float radius = 0.9 * fract(sin(float(i) * 78.233 + iTime) * 43758.5453);
+
+            // Adjust radius to avoid empty circle
+            radius *= 0.4 *  fract(sin(float(i) * 93.233 + iTime) * 43758.5453);
+
+            // Calculate spark position
+            float2 sparkPos = half2(0.5, 0.5) + radius * float2(cos(angle), sin(angle));
+            //float2 sparkPos = mouse + radius * float2(0.5, 0.5);
+
+            // Calculate the intensity of the spark
+            float sparkIntensity = smoothstep(0.001, 0.06, 0.045 - distance(uv, sparkPos));
+
+            // Add the spark color
+            //color += half4(1.0, 1.0, 0.0, 1.0) * sparkIntensity;
+            vec3  rgb = 0.5 + cos(iTime + float3(0.0, 2.0, 4.0));
+            color += half4(rgb, 1.0) * sparkIntensity;
+        }
+
+        return color;
+    }
+)";
+
 // Atomic flag to control the event polling thread
 std::atomic<bool> running(true);
 std::mutex mainLoopMutex;
@@ -84,73 +129,73 @@ std::pair<std::vector<SkPoint>, std::vector<std::pair<size_t, size_t>>>  generat
     float offset = length;
     const float div  = (float) n / 4;
     for (int i = intervals[0].first; i < intervals[0].second; ++i) {
-        int mid = midpoint(intervals[0].first, intervals[0].second);
+        // int mid = midpoint(intervals[0].first, intervals[0].second);
         float x,y;
-        if (i == mid) {
-            x = centerX - radiusX;
-            y = centerY - radiusY;
-        } else if (i < mid) {
+        if (i == intervals[0].first) {
             x = centerX - radiusX;
             y = centerY - radiusY + offset;
-            offset -= offset / div;
-        } else {
+            // offset -= offset / div;
+        } else if (i == intervals[0].second - 1) {
             x = centerX - radiusX + offset;
             y = centerY - radiusY;
-            offset += offset / div;
+            // offset += offset / div;
+        } else {
+            x = centerX - radiusX;
+            y = centerY - radiusY;
         }
         points.emplace_back(SkPoint::Make(x, y));
     }
     offset = length;
     for (int i = intervals[1].first; i < intervals[1].second; ++i) {
-        int mid =  midpoint(intervals[1].first, intervals[1].second);
+        // int mid =  midpoint(intervals[1].first, intervals[1].second);
         float x,y;
-        if (i == mid) {
-            x = centerX + radiusX;
-            y = centerY - radiusY;
-        } else if (i < mid) {
+        if (i == intervals[1].first) {
             x = centerX + radiusX - offset;
             y = centerY - radiusY;
-            offset -= offset / div;
-        } else {
+            // offset -= offset / div;
+        } else if (i == intervals[1].second - 1) {
             x = centerX + radiusX;
             y = centerY - radiusY + offset;
-            offset += offset / div;
+            // offset += offset / div;
+        } else {
+            x = centerX + radiusX;
+            y = centerY - radiusY;
         }
         points.emplace_back(SkPoint::Make(x, y));
     }
     offset = length;
     for (int i = intervals[2].first; i < intervals[2].second; ++i) {
-        int mid = midpoint(intervals[2].first, intervals[2].second);
+        // int mid = midpoint(intervals[2].first, intervals[2].second);
         float x,y;
-        if (i == mid) {
-            x = centerX + radiusX;
-            y = centerY + radiusY;
-        } else if (i < mid) {
+        if (i == intervals[2].first) {
             x = centerX + radiusX;
             y = centerY + radiusY - offset;
-            offset -= offset / div;
-        } else {
+            // offset -= offset / div;
+        } else if (i == intervals[2].second - 1) {
             x = centerX + radiusX - offset;
             y = centerY + radiusY;
-            offset += offset / div;
+            // offset += offset / div;
+        } else {
+            x = centerX + radiusX;
+            y = centerY + radiusY;
         }
         points.emplace_back(SkPoint::Make(x, y));
     }
     offset = length;
     for (int i = intervals[3].first; i < intervals[3].second; ++i) {
-        int mid = midpoint(intervals[3].first, intervals[3].second);
+        // int mid = midpoint(intervals[3].first, intervals[3].second);
         float x,y;
-        if (i == mid) {
-            x = centerX - radiusX;
-            y = centerY + radiusY;
-        } else if (i < mid) {
+        if (i == intervals[3].first) {
             x = centerX - radiusX + offset;
             y = centerY + radiusY;
-            offset -= offset / div;
-        } else {
+            // offset -= offset / div;
+        } else if (i == intervals[3].second - 1) {
             x = centerX - radiusX;
             y = centerY + radiusY - offset;
-            offset += offset / div;
+            // offset += offset / div;
+        } else {
+            x = centerX - radiusX;
+            y = centerY + radiusY;
         }
         points.emplace_back(SkPoint::Make(x, y));
     }
@@ -160,7 +205,7 @@ std::pair<std::vector<SkPoint>, std::vector<std::pair<size_t, size_t>>>  generat
         // return {};
     }
     //Debug
-    for (int i =0; i < points.size() ; i++) {
+    for (int i =0; i < points.size(); i++) {
         if (i % 5 == 0) {
             printf("\n");
         }
