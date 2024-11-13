@@ -66,65 +66,49 @@ public:
         if (m_isStarted && fn && !m_pointStorage->empty()) {
             auto timePassed = std::min(m_timePoint - m_startTime, ANIMATION_TTL);
 
-            auto x = left.x;
-            auto y = left.y;
-
             auto w = right.x - left.x;
             auto h = right.y - left.y;
 
-            float qH = h / 2;
-            float qW = w / 2;
+            float halfH = h / 2;
+            float halfW = w / 2;
 
-            float l = std::min(qH, qW) / 4;
+            float cornelLengh = std::min(halfH, halfW) / 4;
 
-            float wInc = ((w / 2 - l) / static_cast<float>(ANIMATION_TTL.count())) * static_cast<float>(timePassed.count());
-            float HInc = ((h / 2 - l) / static_cast<float>(ANIMATION_TTL.count())) * static_cast<float>(timePassed.count());
-
-            std::cout << "ashim: wInc-> " << wInc << "   timePassed: " << timePassed.count() << "\n";
-
+            float wInc = ((w / 2 - cornelLengh) / static_cast<float>(ANIMATION_TTL.count())) * static_cast<float>(timePassed.count());
+            float HInc = ((h / 2 - cornelLengh) / static_cast<float>(ANIMATION_TTL.count())) * static_cast<float>(timePassed.count());
 
             ConicFragment leftTop;
             ConicFragment rightTop;
             ConicFragment leftBottom;
             ConicFragment rightBottom;
             {
-                // left up
-                auto _y = std::max((h / 2 + y) - HInc, y + l);
-                auto _x = std::max((w / 2 + x) - wInc, x + l);
-                leftTop.p0 = { x, _y };
-                leftTop.p1 = { x, y };
-                leftTop.p2 = { _x, y };
+                leftTop.p0 = { left.x, std::max((h / 2 + left.y) - HInc, left.y + cornelLengh) };
+                leftTop.p1 = { left.x, left.y };
+                leftTop.p2 = { std::max((w / 2 + left.x) - wInc, left.x + cornelLengh), left.y };
             }
 
             {
                 // left down
-                auto _y = std::min((h / 2 + y) + HInc, y + h - l);
-                auto _x = std::max((w / 2 + x) - wInc, x + l);
-                leftBottom.p0 = { x, _y };
-                leftBottom.p1 = { x, y + h };
-                leftBottom.p2 = { _x, y + h };
+                leftBottom.p0 = { left.x, std::min((h / 2 + left.y) + HInc, left.y + h - cornelLengh) };
+                leftBottom.p1 = { left.x, left.y + h };
+                leftBottom.p2 = { std::max((w / 2 + left.x) - wInc, left.x + cornelLengh), left.y + h };
             }
 
             {
                 // right up
-                auto _y = std::max((h / 2 + y) - HInc, y + l);
-                auto _x = std::min((w / 2 + x) + wInc, x + w - l);
-                rightTop.p0 = { (x + w), _y };
-                rightTop.p1 = { (x + w), y };
-                rightTop.p2 = { _x, y };
+                rightTop.p0 = { (left.x + w), std::max((h / 2 + left.y) - HInc, left.y + cornelLengh) };
+                rightTop.p1 = { (left.x + w), left.y };
+                rightTop.p2 = { std::min((w / 2 + left.x) + wInc, left.x + w - cornelLengh), left.y };
             }
 
             {
                 // right down
-                auto _y = std::min((h / 2 + y) + HInc, y + h - l);
-                auto _x = std::min((w / 2 + x) + wInc, x + w - l);
-
-                rightBottom.p0 = { (x + w), _y };
-                rightBottom.p1 = { (x + w), y + h };
-                rightBottom.p2 = { _x, y + h };
+                rightBottom.p0 = { (left.x + w), std::min((h / 2 + left.y) + HInc, left.y + h - cornelLengh) };
+                rightBottom.p1 = { (left.x + w), left.y + h };
+                rightBottom.p2 = { std::min((w / 2 + left.x) + wInc, left.x + w - cornelLengh), left.y + h };
             }
 
-            fn({ x + qW,  y + qH }, leftTop, rightTop, leftBottom, rightBottom);
+            fn({ left.x + halfW,  left.y + halfH }, leftTop, rightTop, leftBottom, rightBottom);
         }
     }
 
