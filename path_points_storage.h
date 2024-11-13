@@ -55,6 +55,10 @@ public:
         return m_pathLength;
     }
 
+    const hmos::Point& operator [](int idx) const {
+        return m_pathPoints[idx];
+    }
+
 private:
     std::vector<hmos::Point> m_pathPoints;
     float m_pathLength = 0.0f;

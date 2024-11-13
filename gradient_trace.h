@@ -17,6 +17,8 @@
 
 using ColorType = uint32_t;
 
+static constexpr std::chrono::milliseconds DISAPPEAR_TIME{ 400 }; // time to dissapear
+
 static constexpr ColorType C1 = 4294901760; // SK_ColorRED;
 static constexpr ColorType C2 = 4294967040; // SK_ColorYELLOW;
 static constexpr ColorType C3 = 4278190335; //SK_ColorBLUE;
@@ -24,9 +26,9 @@ static constexpr ColorType C3 = 4278190335; //SK_ColorBLUE;
 static constexpr float SEGMENT_WIDTH = 20.0f;
 
 struct SkiaColorHelper {
-    static ColorType build(uint8_t r, uint8_t g, uint8_t b)
+    static ColorType build(uint8_t a, uint8_t r, uint8_t g, uint8_t b)
     {
-        return  (0xFF << 24) | (r << 16) | (g << 8) | (b << 0);
+        return  (a << 24) | (r << 16) | (g << 8) | (b << 0);
     }
 
     static uint8_t ColorGetR(ColorType c)
@@ -63,11 +65,29 @@ public:
 
     ~GradientTrace() = default;
 
+    void onTimeTick(std::chrono::milliseconds timePoint)
+    {
+
+        m_onTickTime = timePoint;
+    }
+
+    void onComplete()
+    {
+        m_completeFlag = true;
+        m_completeTime = m_onTickTime;
+    }
+
     void onDraw(GradientTraceDrawFn fn)
     {
         if (fn && !m_pointStorage->empty()) {
             const auto& points = m_pointStorage->getPathPoints();
             std::cout << "ashim: PATH_LENGTH-> " << m_pointStorage->getPathLength() << "\n";
+            uint8_t alpha = 0xFF;
+            if (m_completeFlag) {
+                auto timePassed = std::min((m_onTickTime - m_completeTime), DISAPPEAR_TIME);
+                auto fraction = static_cast<float>(timePassed.count()) / static_cast<float>(DISAPPEAR_TIME.count());
+                alpha = static_cast<float>(alpha) * (1.0 - fraction);
+            }
             float dist = 0.0;
             for (int i = 0; i < points.size() - 1; ++i) {
                 hmos::Point p1{ points[i].x,  points[i].y };
@@ -76,7 +96,7 @@ public:
                 std::cout << "ashim: points-> " << p1 << p2 << "\n";
                 std::cout << "ashim: p1_dist-> " << dist << "\n";
                 std::cout << "ashim: p2_dist-> " << (dist + p1p2dist) << "\n";
-                fn(p1, calculateColor(dist), p2, calculateColor(dist + p1p2dist), SEGMENT_WIDTH);
+                fn(p1, calculateColor(dist, alpha), p2, calculateColor(dist + p1p2dist, alpha), SEGMENT_WIDTH);
                 dist += p1p2dist;
             }
         }
@@ -88,7 +108,12 @@ private:
     */
     PathPointsStorage* m_pointStorage;
 
-    ColorType calculateColor(float point_distance) const {
+    std::chrono::milliseconds m_onTickTime;
+    std::chrono::milliseconds m_completeTime;
+
+    bool m_completeFlag {false};
+
+    ColorType calculateColor(float point_distance, uint8_t alpha) const {
         static auto INTERPOLATOR = [](float _x, float _xa, ColorType colA, float _xb, ColorType colB) {
             return static_cast<uint8_t>(((_x - _xa) / (_xb - _xa)) * (static_cast<float>(colB) - static_cast<float>(colA)) + static_cast<float>(colA));
         };
@@ -118,7 +143,7 @@ private:
         std::cout << "ashim: g-> " << (int)g << "\n";
         std::cout << "ashim: b-> " << (int)b << "\n";
 
-        return ColorHelper::build(r, g, b);
+        return ColorHelper::build(alpha, r, g, b);
     };
 };
 

@@ -16,6 +16,7 @@
 #include "gradient_trace.h"
 #include "spark.h"
 #include "path_points_storage.h"
+#include "rect_animator.h"
 
 class PathLightEffect {
 
@@ -23,7 +24,8 @@ public:
     PathLightEffect() : 
         m_gradientTrace{ m_pathStorage },
         m_lazerTrace{ m_pathStorage },
-        m_clusterStorage{ m_pathStorage }
+        m_clusterStorage{ m_pathStorage },
+        m_rectAnimator{ m_pathStorage }
     {
 
     }
@@ -45,6 +47,7 @@ public:
             m_clusterStorage = ClusterStorage{ m_pathStorage };
             m_lazerTrace = LazerTrace{ m_pathStorage };
             m_gradientTrace = GradientTrace{ m_pathStorage };
+            m_rectAnimator = RectAnimator{ m_pathStorage };
             m_toCompleteFlag.store(false);
         }
 
@@ -53,30 +56,37 @@ public:
         m_pathStorage.addPoints(points);
         m_lazerTrace.onPointsAdded(timePoint, startIndex, endIndex);
         m_clusterStorage.onPointsAdded(timePoint, startIndex, endIndex);
+        m_rectAnimator.onPointsAdded(timePoint, startIndex, endIndex);
         if (m_toCompleteFlag) {
             startIndex = endIndex++;
             m_pathStorage.addPoints({ m_pathStorage.getPathPoints().front() });
             m_lazerTrace.onPointsAdded(timePoint, startIndex, startIndex);
             m_clusterStorage.onPointsAdded(timePoint, startIndex, startIndex);
+            m_rectAnimator.onPointsAdded(timePoint, startIndex, startIndex);
         }
     }
 
     void onTimeTick(std::chrono::milliseconds timePoint)
     {
-        if (m_toCompleteFlag) {
+        if (m_toCompleteFlag.exchange(false)) {
             m_lazerTrace.onComplete();
             m_clusterStorage.onComplete();
+            m_gradientTrace.onComplete();
+            m_rectAnimator.start(timePoint);
         }
 
+        m_gradientTrace.onTimeTick(timePoint);
         m_clusterStorage.onTimeTick(timePoint);
         m_lazerTrace.onTimeTick(timePoint);
+        m_rectAnimator.onTimeTick(timePoint);
     }
 
-    void onDraw(GradientTraceDrawFn gradTraceDraw, DrawLaszerSegmentFn lazerFn, SparkDrawFn sparkFn)
+    void onDraw(GradientTraceDrawFn gradTraceDraw, DrawLaszerSegmentFn lazerFn, SparkDrawFn sparkFn, DrawRectAnimatorFn rectAnimatorFn)
     {
         m_gradientTrace.onDraw(gradTraceDraw);
         m_lazerTrace.onDraw(lazerFn);
         m_clusterStorage.onDraw(sparkFn);
+        m_rectAnimator.onDraw(rectAnimatorFn);
     }
 
     const std::vector<hmos::Point>& getPathPoints() const {
@@ -95,6 +105,7 @@ private:
     ClusterStorage m_clusterStorage;
     LazerTrace m_lazerTrace;
     GradientTrace m_gradientTrace;
+    RectAnimator m_rectAnimator;
 };
 
 

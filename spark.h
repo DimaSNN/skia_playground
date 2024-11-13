@@ -232,7 +232,7 @@ public:
     }
 
     void onDraw(SparkDrawFn fn) {
-        if (fn) {
+        if (fn && !m_completeFlag) {
             for (auto&& c : m_clusters) {
                 for (auto s : c.Sparks()) {
                     if (s.isAlive(m_timePoint)) {

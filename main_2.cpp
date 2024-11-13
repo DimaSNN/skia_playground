@@ -1,6 +1,8 @@
 #include <SDL.h>
 #include <SDL_events.h>
 
+#include "include/effects/SkDashPathEffect.h"
+#include "include/core/SkPathEffect.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkSurface.h"
 #include "include/core/SkPaint.h"
@@ -172,6 +174,8 @@ std::vector<hmos::Point> gTmpPoints;
 std::optional<hmos::Point> gLastPoint;
 std::optional<hmos::Point> gFirstPoint;
 
+int gMouseClick = 0;
+
 PathLightEffect gPathLightEffect;
 
 struct Ranges{int minX=0, minY=0, maxX=0, maxY=0;};
@@ -187,6 +191,7 @@ void handlePanEvent(SDL_Event &event)
     {
     case SDL_MOUSEBUTTONDOWN: {
         const SDL_MouseButtonEvent& evt = event.button;
+        gMouseClick++;
         //std::cout << "Pan started at (x:" << evt.x << ", y:" << evt.y << ")\n";
         panStarted = true;
         ranges = Ranges{ evt.x, evt.y, evt.x, evt.y };
@@ -205,6 +210,7 @@ void handlePanEvent(SDL_Event &event)
         break;
     }
     case SDL_MOUSEMOTION: {
+        gMouseClick++;
         const SDL_MouseMotionEvent& evt = event.motion;
         //std::cout << "ashim: Pan updated to (x:" << evt.x << ", y:" << evt.y << ")\n";
         if (panStarted) {
@@ -289,89 +295,108 @@ void draw(SkCanvas* canvas)
         paint.setStyle(SkPaint::kStroke_Style);
         paint.setStrokeWidth(10);
 
-        SkPoint p1 = { 0, 0 };
-        SkPoint p2 = { 200, 0 };
-        SkPoint p3 = { 200, 200 };
-        SkPoint p4 = { 0, 200 };
-        SkPoint p5 = { 150, 190 };
-
-        auto calcColor = [](float length, float full_length) {
-            auto rStart = SkColorGetR(COLOR_START);
-            auto rEnd = SkColorGetR(COLOR_END);
-            auto cDiff = (static_cast<int>(rEnd) - static_cast<int>(rStart));
-            auto red = static_cast<int>(rStart) + (cDiff / full_length) * length;
-
-            auto gStart = SkColorGetG(COLOR_START);
-            auto gEnd = SkColorGetG(COLOR_END);
-            cDiff = (static_cast<int>(gEnd) - static_cast<int>(gStart));
-            auto green = static_cast<int>(gStart) + (cDiff / full_length) * length;
-
-            auto bStart = SkColorGetB(COLOR_START);
-            auto bEnd = SkColorGetB(COLOR_END);
-            cDiff = (static_cast<int>(bEnd) - static_cast<int>(bStart));
-            auto blue = static_cast<int>(bStart) + (cDiff / full_length) * length;
-
-
-            //std::cout << "ashim: r-> " << red << "\n";
-            std::cout << "ashim: g-> " << green << "\n";
-            //std::cout << "ashim: b-> " << blue << "\n";
-            return SkColorSetARGB(0xFF, static_cast<int>(red), static_cast<int>(green), static_cast<int>(blue));
-        };
-
+        SkPoint p1 = { 10, 10 };
+        SkPoint p2 = { 110, 110 };
+        
         {
-            SkPath path2;
             SkScalar positions[] = { 0.0, 1.0 };
             SkPoint pts[] = { p1, p2 };
-            SkColor colors_x[] = { calcColor(0, 600), calcColor(200, 600) };
+            SkColor colors_x[] = { SK_ColorYELLOW, SK_ColorBLUE };
+            //auto lgs = SkGradientShader::MakeLinear(pts, colors_x, positions, 2, SkTileMode::kClamp, 0, NULL);
+            //paint.setShader(lgs);
 
-            auto lgs = SkGradientShader::MakeLinear(pts, colors_x, positions, 2, SkTileMode::kClamp, 0, NULL);
-            paint.setShader(lgs);
 
-            path2.moveTo(p1);
-            path2.lineTo(p2);
+            auto x = 50;
+            auto y = 50;
 
-            canvas->drawPath(path2, paint);
-        }
+            auto w = 400;
+            auto h = 100;
 
-        {
-            SkPath path2;
-            SkScalar positions[] = { 0.0, 1.0 };
-            SkPoint pts[] = { p2, p3 };
-            SkColor colors_x[] = { calcColor(200, 600), calcColor(400, 600) };
+            SkRect rect = SkRect::MakeXYWH(x, y, w, h);
+            SkPath rectPath;
 
-            auto lgs = SkGradientShader::MakeLinear(pts, colors_x, positions, 2, SkTileMode::kClamp, 0, NULL);
-            paint.setShader(lgs);
+            float qH = h / 2;
+            float qW = w / 2;
 
-            path2.moveTo(p2);
-            path2.lineTo(p3);
+            float l = std::min(qH, qW) / 4;
+            
+            float wInc = gMouseClick + 1.0;
+            float HInc = gMouseClick + 1.0;
 
-            canvas->drawPath(path2, paint);
-        }
+            float conicW = 0.9f;
 
-        {
-            SkPath path2;
-            SkScalar positions[] = { 0.0, 1.0 };
-            SkPoint pts[] = { p3, p4 };
-            SkColor colors_x[] = { calcColor(400, 600), calcColor(600, 600) };
+            {
+                // left up
+                SkPath p;
+                auto _y = std::max((h / 2 + y) - HInc, y + l);
+                auto _x = std::max((w / 2 + x) - wInc, x + l);
+                rectPath.moveTo(x, _y);
+                rectPath.conicTo({ x, y }, { _x, y }, conicW);
+                //canvas->drawPath(p, paint);
+            }
 
-            auto lgs = SkGradientShader::MakeLinear(pts, colors_x, positions, 2, SkTileMode::kClamp, 0, NULL);
-            paint.setShader(lgs);
+            {
+                // left down
+                SkPath p;
+                auto _y = std::min((h / 2 + y) + HInc, y + h - l);
+                auto _x = std::max((w / 2 + x) - wInc, x + l);
+                rectPath.moveTo(x, _y);
+                rectPath.conicTo({ x, y + h }, { _x, y + h }, conicW);
+                //canvas->drawPath(p, paint);
+            }
 
-            path2.moveTo(p3);
-            path2.lineTo(p4);
+            {
+                // right up
+                SkPath p;
+                
+                auto _y = std::max((h / 2 + y) - HInc, y + l);
+                auto _x = std::min((w / 2 + x) + wInc, x + w - l);
 
-            canvas->drawPath(path2, paint);
-        }
+                rectPath.moveTo((x + w), _y);
+                rectPath.conicTo({ (x + w), y }, { _x, y }, conicW);
+                //canvas->drawPath(p, paint);
+            }
 
-        {
-            SkPaint dotPaint;
-            dotPaint.setStyle(SkPaint::kFill_Style);
-            dotPaint.setColor(SK_ColorRED);
-            canvas->drawCircle(p1, 2, dotPaint);
-            canvas->drawCircle(p2, 2, dotPaint);
-            canvas->drawCircle(p3, 2, dotPaint);
-            canvas->drawCircle(p4, 2, dotPaint);
-            canvas->drawCircle(p5, 2, dotPaint);
+            {
+                // right down
+                SkPath p;
+
+                auto _y = std::min((h / 2 + y) + HInc, y + h - l);
+                auto _x = std::min((w / 2 + x) + wInc, x + w - l);
+
+                rectPath.moveTo((x + w), _y);
+                rectPath.conicTo({ (x + w), y + h }, { _x, y + h }, conicW);
+                //canvas->drawPath(p, paint);
+            }
+
+            //rectPath.addRoundRect(rect, 10, 10);
+
+            // Dash effect
+           // SkScalar intervals[] = { 40, 60 };
+            float fraction = 1.0 - static_cast<float>(gMouseClick) / 10;
+            fraction = 1.0;
+            float quart = (h+w)/2;
+            auto vis = quart * fraction;
+            auto invis = quart - vis;
+
+
+            SkColor colors[4] = { SK_ColorRED, SK_ColorGREEN, SK_ColorYELLOW, SK_ColorBLUE };
+            paint.setShader(SkGradientShader::MakeSweep(x+w/2.0f, y+h/2, colors, nullptr, 4, 0, nullptr));
+            paint.setMaskFilter(SkMaskFilter::MakeBlur(kSolid_SkBlurStyle, 15.0f));
+            canvas->drawPath(rectPath, paint);
+            canvas->drawPath(rectPath, paint);
+
+            {
+                SkPaint sparkPaint;
+                sparkPaint.setAntiAlias(true);
+                sparkPaint.setStyle(SkPaint::kFill_Style);
+                sparkPaint.setColor(SkColorSetARGB(0xFF, 0x99, 0xff, 0xff));
+                canvas->drawCircle({ 50,50 }, 2, sparkPaint);
+                canvas->drawCircle({ 70,50 }, 2, sparkPaint);
+                canvas->drawCircle({ 100,50 }, 2, sparkPaint);
+                canvas->drawCircle({ 130,50 }, 2, sparkPaint);
+                canvas->drawCircle({ 150,50 }, 2, sparkPaint);
+            }
         }
     }
 
@@ -458,11 +483,11 @@ int main(int argc, char *argv[])
             gPathLightEffect.onTimeTick(curr_time);
 
             SkPaint gradientTracePaint;
-            gradientTracePaint.setMaskFilter(SkMaskFilter::MakeBlur(kSolid_SkBlurStyle, 20.0f));
             gradientTracePaint.setAntiAlias(true);
             gradientTracePaint.setStyle(SkPaint::kStroke_Style);
             gradientTracePaint.setStrokeCap(SkPaint::kRound_Cap);
-            gradientTracePaint.setStrokeWidth(20);
+            gradientTracePaint.setStrokeWidth(5);
+            gradientTracePaint.setMaskFilter(SkMaskFilter::MakeBlur(kSolid_SkBlurStyle, 10.0f));
 
             auto gradientTraceDraw = [&canvas, &gradientTracePaint](const hmos::Point& p1, const ColorType& c1, const hmos::Point& p2, const ColorType& c2, float width) {
                 SkPath path;
@@ -482,7 +507,7 @@ int main(int argc, char *argv[])
             lazerPaint.setColor(SkColorSetARGB(0xFF, 0x99, 0xff, 0xff));
             lazerPaint.setStrokeCap(SkPaint::kRound_Cap);
             lazerPaint.setStyle(SkPaint::kStroke_Style);
-            lazerPaint.setMaskFilter(SkMaskFilter::MakeBlur(kSolid_SkBlurStyle, 20.0f, true));
+            lazerPaint.setMaskFilter(SkMaskFilter::MakeBlur(kSolid_SkBlurStyle, 10.0f, true));
             auto lazerDraw = [&canvas, &lazerPaint](const hmos::Point& pStart, const hmos::Point& pEnd, float width) {
                 std::cout << "ashim: draw point-> " << pStart << pEnd << "\n";
                 std::cout << "ashim: draw width-> " << width << "\n";
@@ -502,10 +527,41 @@ int main(int argc, char *argv[])
                 canvas->drawCircle(p.x, p.y, s.getRadius(), sparkPaint);
             };
 
-            gPathLightEffect.onDraw(gradientTraceDraw, lazerDraw, sparkDraw);
+            SkPaint rectAnimatorPaint;
+            rectAnimatorPaint.setAntiAlias(true);
+            rectAnimatorPaint.setStyle(SkPaint::kStroke_Style);
+            rectAnimatorPaint.setStrokeWidth(5);
+            rectAnimatorPaint.setColor(SkColorSetARGB(0xFF, 0x99, 0xff, 0xff));
+            rectAnimatorPaint.setMaskFilter(SkMaskFilter::MakeBlur(kSolid_SkBlurStyle, 10.0f, true));
+
+            auto rectAnimatorDraw = [&canvas, &rectAnimatorPaint](const hmos::Point& c, const ConicFragment& leftTop, const ConicFragment& rightTop, const ConicFragment& leftBottom, const ConicFragment& rightBottom) {
+                SkPath path;
+                
+                path.moveTo({ leftTop.p0.x, leftTop.p0.y });
+                path.conicTo({ leftTop.p1.x, leftTop.p1.y }, { leftTop.p2.x, leftTop.p2.y }, 0.9f);
+                
+                path.moveTo({ leftBottom.p0.x, leftBottom.p0.y });
+                path.conicTo({ leftBottom.p1.x, leftBottom.p1.y }, { leftBottom.p2.x, leftBottom.p2.y }, 0.9f);
+
+                path.moveTo({ rightTop.p0.x, rightTop.p0.y });
+                path.conicTo({ rightTop.p1.x, rightTop.p1.y }, { rightTop.p2.x, rightTop.p2.y }, 0.9f);
+
+                path.moveTo({ rightBottom.p0.x, rightBottom.p0.y });
+                path.conicTo({ rightBottom.p1.x, rightBottom.p1.y }, { rightBottom.p2.x, rightBottom.p2.y }, 0.9f);
+                
+                {
+                    SkColor colors[4] = { SK_ColorRED, SK_ColorGREEN, SK_ColorYELLOW, SK_ColorBLUE };
+                    rectAnimatorPaint.setShader(SkGradientShader::MakeSweep(c.x, c.y, colors, nullptr, 4, 0, nullptr));
+                }
+
+                canvas->drawPath(path, rectAnimatorPaint);
+                canvas->drawPath(path, rectAnimatorPaint);
+            };
+
+            gPathLightEffect.onDraw(gradientTraceDraw, lazerDraw, sparkDraw, rectAnimatorDraw);
             //gPathLightEffect.onDraw(gradientTraceDraw, nullptr, nullptr);
 
-            if (1) {
+            if (0) {
                 // Draw points
                 SkPaint sparkPaint;
                 sparkPaint.setAntiAlias(true);
@@ -516,14 +572,9 @@ int main(int argc, char *argv[])
                 }
             }
         }
-       
-        
 
         //draw(canvas);
-        //std::exit(0);
-        
-
-
+       
         context->flushAndSubmit();
 
         //copy pixels

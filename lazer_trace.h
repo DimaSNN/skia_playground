@@ -19,7 +19,7 @@ using speed_vec_t = hmos::Point;
 using DrawLaszerSegmentFn = std::function<void(const hmos::Point& pStart, const hmos::Point& pEnd, float width)>;
 
 static constexpr std::chrono::milliseconds SEGMENT_TTL{ 800 }; // time to live for spark
-static constexpr float SEGMENT_MAX_WIDTH = 20.0f;
+static constexpr float SEGMENT_MAX_WIDTH = 10.0f;
 static constexpr float SEGMENT_MIN_WIDTH = 0.0f;
 static constexpr float MIN_DISTANCE_TO_ADD = 0.0f;
 
@@ -69,9 +69,6 @@ public:
             }
             else if (pathPoints[m_points.back().m_point] != pathPoints[i] && pathPoints[m_points.back().m_point].distance(pathPoints[i]) >= MIN_DISTANCE_TO_ADD) {
                 std::cout << "ashim: add new point " << pathPoints[i] << "\n";
-               // auto lastPointCopy = m_points.back(); // copy lazer point
-                //m_points.back() = PointData{ lastPointCopy.m_point, timePoint };
-                //lastPointCopy.m_point = i; // update position for lazer point
                 auto timeCopy = m_points.back().m_burnTime;
                 m_points.back().m_burnTime = timePoint;
                 m_points.emplace_back(PointData{ i, timeCopy });
@@ -96,7 +93,7 @@ public:
 
     void onDraw(DrawLaszerSegmentFn fn)
     {
-        if (fn && !m_points.empty()) {
+        if (fn && !m_completeFlag && !m_points.empty()) {
             const auto& pathPoints = m_pointStorage->getPathPoints();
             auto mainPointIndex = m_points.size() - 1;
             auto mainPointWidth = m_points[mainPointIndex].getWidthForTime(m_timePoint, !m_completeFlag);
