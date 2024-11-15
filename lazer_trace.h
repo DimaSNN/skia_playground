@@ -98,7 +98,7 @@ public:
             auto mainPointIndex = m_points.size() - 1;
             auto mainPointWidth = m_points[mainPointIndex].getWidthForTime(m_timePoint, !m_completeFlag);
             float widthStep = mainPointWidth / m_points.size();
-            for (auto i = 0; i < m_points.size(); ++i) {
+            for (size_t i = 0; i < m_points.size(); ++i) {
                 const auto& p1 = pathPoints[m_points[i].m_point];
                 if (i == mainPointIndex) {
                     // lazer point head (current finger position)

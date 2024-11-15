@@ -89,7 +89,7 @@ public:
                 alpha = static_cast<float>(alpha) * (1.0 - fraction);
             }
             float dist = 0.0;
-            for (int i = 0; i < points.size() - 1; ++i) {
+            for (size_t i = 0; i < points.size() - 1; ++i) {
                 hmos::Point p1{ points[i].x,  points[i].y };
                 hmos::Point p2{ points[i + 1].x,  points[i + 1].y };
                 auto p1p2dist = p1.distance(p2);

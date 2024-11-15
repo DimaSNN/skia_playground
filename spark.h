@@ -198,7 +198,7 @@ public:
             }
 
             const auto& pathPoints = m_pointStorage->getPathPoints();
-            for (auto i = 0; i < m_clusters.size(); ++i) {
+            for (size_t i = 0; i < m_clusters.size(); ++i) {
                 auto& cluster = m_clusters[i];
                 auto sparksCnt = cluster.shouldCreateSpark(m_timePoint);
                 if (sparksCnt) {
@@ -222,7 +222,6 @@ public:
 
     void onPointsAdded(std::chrono::milliseconds timePoint, size_t startIndex, size_t endIndex)
     {
-        const auto& pathPoints = m_pointStorage->getPathPoints();
         for (auto i = startIndex; i <= endIndex; ++i) {
             if (m_clusters.empty() || m_clusters.back().checkForCross(*m_pointStorage, i) == false) {
                 // no clusters or we far from previous cluster - create new one

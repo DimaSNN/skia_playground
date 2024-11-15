@@ -21,19 +21,17 @@
 class PathLightEffect {
 
 public:
-    PathLightEffect() : 
-        m_gradientTrace{ m_pathStorage },
-        m_lazerTrace{ m_pathStorage },
+    PathLightEffect(int w, int h) : 
         m_clusterStorage{ m_pathStorage },
-        m_rectAnimator{ m_pathStorage }
+        m_lazerTrace{ m_pathStorage },
+        m_gradientTrace{ m_pathStorage },
+        m_rectAnimator{ m_pathStorage, w, h }, 
+        m_width{w},
+        m_height{h}
     {
 
     }
     ~PathLightEffect() = default;
-
-    void markToReset() {
-        m_toResetFlag.store(true);
-    }
 
     void markToComplete()
     {
@@ -42,15 +40,6 @@ public:
 
     void addPoints(std::chrono::milliseconds timePoint, const std::vector<hmos::Point>& points)
     {
-        if (m_toResetFlag.exchange(false)) {
-            m_pathStorage = PathPointsStorage{};
-            m_clusterStorage = ClusterStorage{ m_pathStorage };
-            m_lazerTrace = LazerTrace{ m_pathStorage };
-            m_gradientTrace = GradientTrace{ m_pathStorage };
-            m_rectAnimator = RectAnimator{ m_pathStorage };
-            m_toCompleteFlag.store(false);
-        }
-
         auto startIndex = m_pathStorage.getPathPoints().size();
         auto endIndex = startIndex + points.size() - 1;
         m_pathStorage.addPoints(points);
@@ -81,12 +70,12 @@ public:
         m_rectAnimator.onTimeTick(timePoint);
     }
 
-    void onDraw(GradientTraceDrawFn gradTraceDraw, DrawLaszerSegmentFn lazerFn, SparkDrawFn sparkFn, DrawRectAnimatorFn rectAnimatorFn)
+    void onDraw(GradientTraceDrawFn gradTraceDraw, DrawLaszerSegmentFn lazerFn, SparkDrawFn sparkFn, DrawRectAnimatorFn rectAnimatorFn, DrawRectShadowAnimatorFn rectShadowAnimatorFn)
     {
         m_gradientTrace.onDraw(gradTraceDraw);
         m_lazerTrace.onDraw(lazerFn);
         m_clusterStorage.onDraw(sparkFn);
-        m_rectAnimator.onDraw(rectAnimatorFn);
+        m_rectAnimator.onDraw(rectAnimatorFn, rectShadowAnimatorFn);
     }
 
     const std::vector<hmos::Point>& getPathPoints() const {
@@ -99,13 +88,15 @@ private:
     Note: the consumers store only indexes and expect that storage will be only grow!
     */
     PathPointsStorage m_pathStorage{};
-    std::atomic<bool> m_toResetFlag{false};
     std::atomic<bool> m_toCompleteFlag{ false };
-    
+
     ClusterStorage m_clusterStorage;
     LazerTrace m_lazerTrace;
     GradientTrace m_gradientTrace;
     RectAnimator m_rectAnimator;
+
+    int m_width{ 0 };
+    int m_height{ 0 };
 };
 
 

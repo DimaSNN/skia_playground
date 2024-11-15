@@ -26,12 +26,11 @@ public:
     Point(int x, int y) : x(static_cast<float>(x)), y(static_cast<float>(y)) {};
     explicit Point(int val) : x(static_cast<float>(val)), y(static_cast<float>(val)) {};
 
-
     /* Returns the slope of two Points.
      * Formula for finding the slope(m) between
      * two coordinate Points is: (y2-y1) / (x2-x1)
      */
-    float slope(Point p)
+    float slope(const hmos::Point& p)
     {
         return ((p.y - y) / (p.x - x));
     }
@@ -41,7 +40,7 @@ public:
      * Formula for finding the distance(d) between
      * two Points: square_root of [ (x2-x1)^2 + (y2-y1)^2 ]
      */
-    float distance(Point p) const
+    float distance(const hmos::Point& p) const
     {
         float d = ((p.x - x) * (p.x - x)) + ((p.y - y) * (p.y - y));
         return std::sqrt(d);
@@ -54,7 +53,7 @@ public:
      * New(x) = x + (dist / square root of [ (m^2 + 1) ])
      * New(y) = y + (m*dist / square root of [ (m^2 + 1) ])
      */
-    Point increment(Point p, float distance)
+    Point increment(const hmos::Point& p, float distance)
     {
         float m = slope(p);
 
@@ -87,31 +86,31 @@ public:
     //Operators:
 
     //Addition
-    Point operator+=(Point pnt) { (*this).x += pnt.x; (*this).y += pnt.y; return (*this); }
+    Point operator+=(const hmos::Point& pnt) { (*this).x += pnt.x; (*this).y += pnt.y; return (*this); }
     Point operator+=(float num) { (*this).x += num; (*this).y += num; return (*this); }
-    Point operator+(Point pnt) { return Point((*this).x + pnt.x, (*this).y + pnt.y); }
+    Point operator+(const hmos::Point& pnt) { return Point((*this).x + pnt.x, (*this).y + pnt.y); }
     Point operator+(float num) { return Point((*this).x + num, (*this).y + num); }
 
     //Subtraction
-    Point operator-=(Point pnt) { (*this).x -= pnt.x; (*this).y -= pnt.y; return (*this); }
+    Point operator-=(const hmos::Point& pnt) { (*this).x -= pnt.x; (*this).y -= pnt.y; return (*this); }
     Point operator-=(float num) { (*this).x -= num; (*this).y -= num; return (*this); }
-    Point operator-(Point pnt) { return Point((*this).x - pnt.x, (*this).y - pnt.y); }
+    Point operator-(const hmos::Point& pnt) { return Point((*this).x - pnt.x, (*this).y - pnt.y); }
     Point operator-(float num) { return Point((*this).x - num, (*this).y - num); }
 
     //Multiplication
-    Point operator*=(Point pnt) { (*this).x *= pnt.x; (*this).y *= pnt.y; return (*this); }
+    Point operator*=(const hmos::Point& pnt) { (*this).x *= pnt.x; (*this).y *= pnt.y; return (*this); }
     Point operator*=(float num) { (*this).x *= num; (*this).y *= num; return (*this); }
-    Point operator*(Point pnt) { return Point((*this).x * pnt.x, (*this).y * pnt.y); }
+    Point operator*(const hmos::Point& pnt) { return Point((*this).x * pnt.x, (*this).y * pnt.y); }
     Point operator*(float num) { return Point((*this).x * num, (*this).y * num); }
 
     //Division
-    Point operator/=(Point pnt) { (*this).x /= pnt.x; (*this).y /= pnt.y; return (*this); }
+    Point operator/=(const hmos::Point& pnt) { (*this).x /= pnt.x; (*this).y /= pnt.y; return (*this); }
     Point operator/=(float num) { (*this).x /= num; (*this).y /= num; return (*this); }
-    Point operator/(Point pnt) { return Point((*this).x / pnt.x, (*this).y / pnt.y); }
+    Point operator/(const hmos::Point& pnt) { return Point((*this).x / pnt.x, (*this).y / pnt.y); }
     Point operator/(float num) { return Point((*this).x / num, (*this).y / num); }
 
     //Equal (Assignment)
-    Point operator=(Point pnt) { (*this).x = pnt.x; (*this).y = pnt.y; return (*this); }
+    Point operator=(const Point& pnt) { (*this).x = pnt.x; (*this).y = pnt.y; return (*this); }
     Point operator=(float num) { (*this).x = num; (*this).y = num; return (*this); }
 
     bool operator==(const hmos::Point& other) const {
